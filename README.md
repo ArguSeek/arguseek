@@ -66,9 +66,11 @@ Comprehensive research when your agent needs current knowledge on a topic:
 **Grounding scenarios:**
 ```
 "Research passport.js JWT token expiration validation—check for CVEs and breaking changes since January 2025"
-
+```
+```
 "What changed in React Server Components between v14 and v15? Focus on breaking changes."
-
+```
+```
 "Find production gotchas with Prisma connection pooling in serverless environments—include recent GitHub issues"
 ```
 
@@ -81,30 +83,24 @@ Precise extraction when your agent needs specific information from a known sourc
 - PDF processing via Gemini Vision API
 - Preserves structure for migration guides and API references
 
+**The `looking_for` parameter (optional):**
+When provided, instructs extraction to focus only on specific information. Without it, the tool extracts all content generically.
+
+- **Without `looking_for`**: Returns full page content as markdown
+- **With `looking_for="authentication methods"`**: Returns ONLY auth-related sections; explicitly states "This page doesn't contain information about authentication methods" if absent
+
+This reduces hallucination—the agent reports missing information instead of guessing.
+
 **Grounding scenarios:**
 ```
 "Extract authentication methods from https://docs.stripe.com/api/authentication"
-
+```
+```
 "Parse breaking changes from https://github.com/vercel/next.js/releases/tag/v15.0.0"
-
+```
+```
 "Get migration steps from https://www.prisma.io/docs/guides/upgrade-guides/upgrading-versions"
 ```
-
-## Why Grounding Matters for Production
-
-Without grounding tools, agents generate solutions from:
-- ❌ Training data frozen 6-12 months ago
-- ❌ Generic patterns that may not match your architecture
-- ❌ Outdated API signatures from deprecated library versions
-- ❌ No awareness of recent CVEs or security advisories
-
-**With ArguSeek**, agents work from:
-- ✓ Current security advisories and CVE databases
-- ✓ Latest library documentation and migration guides
-- ✓ Production patterns discovered by the community
-- ✓ Recent GitHub issues and real-world solutions
-
-Grounding transforms "sounds reasonable" into "verifiably correct."
 
 ## Quick Start
 
@@ -112,7 +108,7 @@ Grounding transforms "sounds reasonable" into "verifiably correct."
 >
 > **For local development:** This is fine—use `localhost:8080`
 >
-> **For production:** DO NOT expose port 8080 to the internet without authentication. Use reverse proxy auth, Cloud Run IAM, or API gateway. See [PRODUCTION_SECURITY.md](PRODUCTION_SECURITY.md).
+> **For production:** DO NOT expose port 8080 to the internet without authentication. Use reverse proxy auth, Cloud Run IAM, or API gateway.
 
 ### Self-Hosting with Docker Compose (Recommended)
 
@@ -144,91 +140,6 @@ Grounding transforms "sounds reasonable" into "verifiably correct."
    ```
 
 Your ArguSeek instance is now running locally.
-
-**For detailed installation and deployment options**, see [SELF_HOSTING.md](SELF_HOSTING.md)
-
-## Integration with AI Agents
-
-### Claude Desktop
-
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "arguseek": {
-      "command": "npx",
-      "args": ["arguseek-client"],
-      "env": {
-        "ARGUSEEK_URL": "http://localhost:8080/mcp"
-      }
-    }
-  }
-}
-```
-
-### The Grounding Stack
-
-Production AI coding requires grounding in **two dimensions**:
-
-| Tool | Grounds Agent In | Use When |
-|------|------------------|----------|
-| **ChunkHound** | Your actual codebase | "How does auth work in *this* project?" |
-| **ArguSeek** | Current ecosystem knowledge | "What are current JWT best practices in 2025?" |
-
-**Agentic RAG in practice:**
-The agent decides when to ground itself dynamically:
-
-```
-1. Task: "Fix the auth bug"
-
-2. Agent reasons: "I don't know this codebase's implementation"
-   → Calls: code_research("How does JWT authentication work in this codebase?")
-   → ChunkHound returns: "Uses Passport.js at src/auth.ts:45-67, jsonwebtoken@8.5.1"
-
-3. Agent reasons: "Need current security best practices for JWT"
-   → Calls: research_iteratively("passport.js JWT security best practices 2025")
-   → ArguSeek returns: "CVE-2025-23529 affects <9.0.0, upgrade required, v9 API changes..."
-
-4. Agent synthesizes: Grounded solution from YOUR architecture + CURRENT knowledge
-```
-
-No pre-configured workflows. The agent orchestrates retrieval based on what it learns.
-
-## Effective Usage Examples
-
-### Implementation Tasks
-```
-"Before implementing JWT refresh tokens, research current best practices and security considerations for 2025"
-
-"Find production-ready examples of WebSocket authentication with JWT—include recent patterns"
-```
-
-### Debugging with Current Context
-```
-"Research 'CUDA out of memory' errors in PyTorch 2.x training. Focus on solutions from 2024-2025."
-
-"Search for GitHub issues about NextJS middleware breaking after v14→v15 upgrade"
-```
-
-### Architecture Decisions
-```
-"Compare Prisma vs Drizzle ORM for TypeScript projects—focus on 2025 performance benchmarks and production experiences"
-
-"Research serverless vs containerized deployment trade-offs for real-time applications in 2025"
-```
-
-### Learning with Current Documentation
-```
-"Research FastAPI beyond official docs—find advanced patterns and common mistakes from community experience"
-
-"Use fetch_url to extract WebSocket connection lifecycle from https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-websocket-api.html"
-```
-
-### Combining Both Tools
-```
-"First research the current state management patterns for React in 2025, then fetch_url from the Redux Toolkit docs to compare the latest API"
-```
 
 ## Architecture
 
@@ -281,16 +192,12 @@ ArguSeek implements a layered MCP-based architecture optimized for concurrent ex
 | `GEMINI_API_KEY` | No | Gemini API key (defaults to GOOGLE_API_KEY) |
 | `PORT` | No | Server port (default: 8080) |
 
-See [SELF_HOSTING.md](SELF_HOSTING.md) for detailed configuration options including GCP Secret Manager integration.
-
 ## Deployment Options
 
 - **Docker Compose**: Easiest for most users (recommended)
 - **Binary**: Standalone executable
 - **From Source**: Build and run with Go
 - **Google Cloud Platform**: Optional GCP deployment with Secret Manager
-
-See [SELF_HOSTING.md](SELF_HOSTING.md) for detailed deployment guides.
 
 ## Development
 
@@ -317,39 +224,9 @@ go run cmd/server/main.go
 go test ./...
 ```
 
-For detailed development setup, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
-
-## Contributing
-
-We welcome contributions! Please see:
-
-- [CONTRIBUTING.md](CONTRIBUTING.md) - Contribution guidelines
-- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) - Community standards
-- [SECURITY.md](SECURITY.md) - Security policy
-
-## Documentation
-
-- [Self-Hosting Guide](SELF_HOSTING.md) - Complete deployment instructions
-- [Development Guide](docs/DEVELOPMENT.md) - Local development setup
-- [Production Security](PRODUCTION_SECURITY.md) - Security configuration options
-
 ## License
 
 ArguSeek is released under the [MIT License](LICENSE).
-
-## Support
-
-- **Issues**: https://github.com/ArguSeek/arguseek/issues
-- **Discussions**: https://github.com/ArguSeek/arguseek/discussions
-- **Security**: See [SECURITY.md](SECURITY.md)
-
-## Acknowledgments
-
-Built with:
-- [Model Context Protocol](https://modelcontextprotocol.io/) by Anthropic
-- Google Custom Search API
-- Google Gemini API
-- Go and various open source libraries
 
 ---
 
