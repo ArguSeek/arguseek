@@ -1,5 +1,10 @@
 # ArguSeek
 
+<p align="center">
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/100%25%20AI-Generated-ff69b4.svg" alt="100% AI Generated">
+</p>
+
 **Ground your AI agents in current reality**
 
 LLMs operate from training data frozen at a point in time. Claude Sonnet 4.5's knowledge ended January 2025. When your agent needs to:
