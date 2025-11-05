@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  arguseek:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      # API Keys (required)
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GOOGLE_CSE_ID=${GOOGLE_CSE_ID}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+
+      # Server configuration
+      - PORT=${PORT:-8080}
+      - DEBUG=${DEBUG:-false}
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Resource limits (adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+# Optional: Add volume for logs or cache if needed
+# volumes:
+#   arguseek-data:

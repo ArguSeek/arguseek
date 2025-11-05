@@ -1,0 +1,110 @@
+# If you prefer the allow list template instead of the deny list, see community template:
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+#
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Code coverage profiles and other test artifacts
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+go.work.sum
+
+# env file
+.env
+.env.local
+config/.env.dev
+config/.env.prod
+
+# Actual config files with secrets (only commit .example files)
+config/dev.yaml
+config/prod.yaml
+config/config.yaml
+
+# Editor/IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Build output
+/bin/
+/dist/
+server
+arguseek
+arguseek-server
+deploy
+debug-server
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+/tmp/
+
+# Google Cloud credentials
+*.json
+!config.json.template
+
+# Deployment artifacts
+/deploy/*.tar.gz
+
+# Local development
+/local/
+
+# Database files
+*.db
+*.db.wal
+.chunkhound.lancedb/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Python (removed from project)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# MCP servers (development)
+google-search-mcp/
+*.tgz
+
+# Test files with hardcoded keys
+test-*.go
+test-local-server.sh
+
+# Backup directories
+/backup-*/
+
+.chunkhound/

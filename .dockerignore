@@ -1,0 +1,26 @@
+# Development files
+.chunkhound.db
+.git
+.gitignore
+README.md
+docs/
+tickets/
+deploy/
+server
+arguseek
+bin/
+
+# Dependencies
+node_modules/
+test-package/
+
+# Build artifacts
+*.log
+*.db
+*.tmp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
