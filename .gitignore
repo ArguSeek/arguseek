@@ -49,11 +49,11 @@ Thumbs.db
 # Build output
 /bin/
 /dist/
-server
-arguseek
-arguseek-server
-deploy
-debug-server
+/server
+/arguseek
+/arguseek-server
+/deploy
+/debug-server
 
 # Logs
 *.log

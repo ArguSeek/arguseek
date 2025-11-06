@@ -23,8 +23,8 @@ build:
 	go build -o bin/server ./cmd/server
 
 build-deploy:
-	go build -o deploy cmd/deploy/main.go
-	chmod +x deploy
+	go build -o bin/deploy cmd/deploy/main.go
+	chmod +x bin/deploy
 
 # Test and quality
 test:
@@ -42,16 +42,16 @@ clean:
 
 # Deployment commands
 deploy-dev: ensure-deploy
-	./deploy dev
+	./bin/deploy dev
 
 deploy-dev-dry: ensure-deploy
-	./deploy dev --dry-run
+	./bin/deploy dev --dry-run
 
 deploy-prod: ensure-deploy
-	./deploy prod
+	./bin/deploy prod
 
 deploy-prod-dry: ensure-deploy
-	./deploy prod --dry-run
+	./bin/deploy prod --dry-run
 
 # Local development
 dev:
@@ -61,4 +61,4 @@ dev:
 
 # Check if deploy binary exists, build if not
 ensure-deploy:
-	@if [ ! -f deploy ]; then make build-deploy; fi
+	@if [ ! -f bin/deploy ]; then make build-deploy; fi
