@@ -1,5 +1,0 @@
-# Exclude everything except the client
-*
-!http-mcp-client.js
-!package.json
-!README.md
