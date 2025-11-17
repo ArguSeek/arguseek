@@ -99,6 +99,45 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// MCP protocol content structures
+type ContentBlock struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+type ToolCallResult struct {
+	Content []ContentBlock `json:"content"`
+}
+
+// wrapInContent wraps a tool result (string or object) in MCP content array format
+func wrapInContent(result interface{}) ToolCallResult {
+	var text string
+
+	// Convert result to string
+	switch v := result.(type) {
+	case string:
+		text = v
+	default:
+		// For non-string results, marshal to JSON
+		jsonBytes, err := json.Marshal(v)
+		if err != nil {
+			log.Printf("Warning: Failed to JSON-marshal tool result, using string fallback: %v", err)
+			text = fmt.Sprintf("%v", v)
+		} else {
+			text = string(jsonBytes)
+		}
+	}
+
+	return ToolCallResult{
+		Content: []ContentBlock{
+			{
+				Type: "text",
+				Text: text,
+			},
+		},
+	}
+}
+
 // HandleRequest processes MCP requests without authentication or input validation.
 // This service is designed to be open-by-default for simplicity.
 //
@@ -127,6 +166,10 @@ func (h *Handler) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	switch req.Method {
 	case "initialize":
 		h.handleInitialize(w, req)
+	case "notifications/initialized":
+		// MCP protocol notification - client confirms initialization complete
+		// Per MCP spec: server MUST return HTTP 202 Accepted with no body for client notifications
+		w.WriteHeader(http.StatusAccepted)
 	case "tools/list":
 		h.handleToolsList(w, req)
 	case "tools/call":
@@ -251,7 +294,7 @@ func (h *Handler) handleToolsCall(w http.ResponseWriter, r *http.Request, req Re
 		response := Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result:  result,
+			Result:  wrapInContent(result),
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -273,7 +316,7 @@ func (h *Handler) handleToolsCall(w http.ResponseWriter, r *http.Request, req Re
 		response := Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
-			Result:  result,
+			Result:  wrapInContent(result),
 		}
 
 		w.Header().Set("Content-Type", "application/json")

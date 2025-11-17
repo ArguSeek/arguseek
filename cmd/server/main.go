@@ -84,9 +84,50 @@ func main() {
 		fmt.Fprintf(w, `{"status":"healthy","service":"arguseek"}`)
 	})
 
+	// OAuth discovery endpoint - signals no authentication required
+	// This allows Claude Code CLI and other OAuth-aware clients to connect directly via HTTP transport
+	// The minimal response indicates this server does not implement OAuth authentication
+	oauthIssuer := os.Getenv("OAUTH_ISSUER")
+	if oauthIssuer == "" {
+		// Default to localhost for local development
+		oauthIssuer = "http://localhost:8080"
+	}
+
+	mux.HandleFunc("/.well-known/oauth-authorization-server", func(w http.ResponseWriter, r *http.Request) {
+		// Per RFC 8414: OAuth metadata MUST be queried using HTTP GET
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			w.Header().Set("Allow", "GET")
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		// Minimal OAuth metadata - issuer field signals no OAuth flow required
+		// Use configured issuer URL (from OAUTH_ISSUER env var) for stable identity
+		fmt.Fprintf(w, `{"issuer":%q}`, oauthIssuer)
+	})
+
 	// Setup MCP endpoint without authentication
 	// For production: Add auth via reverse proxy or Cloud Run IAM (see PRODUCTION_SECURITY.md)
 	mux.HandleFunc("/mcp", handler.HandleRequest)
+
+	// Catch-all handler - returns JSON responses for all unregistered paths
+	// Prevents JSON parse errors in MCP clients expecting JSON 404 responses
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		// Root path returns service info for discovery
+		if r.URL.Path == "/" {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{"service":"arguseek","version":"0.3.3","endpoints":["/health","/.well-known/oauth-authorization-server","/mcp"]}`)
+			return
+		}
+
+		// All other unregistered paths return JSON 404
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, `{"error":"not found","path":%q}`, r.URL.Path)
+	})
 
 	server := &http.Server{
 		Addr:         ":" + port,
