@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,12 +21,19 @@ import (
 // This server provides MCP tools for web research without built-in authentication.
 // It is designed to be open-by-default for simplicity and flexibility.
 //
+// By default, the server runs in stdio mode for MCP clients like Claude Code CLI.
+// Use the -http flag to run as an HTTP server (for Cloud Run deployments).
+//
 // Security: For production deployments, add authentication externally via:
 // - Reverse proxy (nginx, Caddy, Traefik)
 // - Cloud Run IAM authentication
 // - API Gateway with custom authorizer
 // - See PRODUCTION_SECURITY.md for detailed options
 func main() {
+	// Parse command-line flags
+	httpMode := flag.Bool("http", false, "run as HTTP server instead of stdio mode")
+	flag.Parse()
+
 	ctx := context.Background()
 
 	// Setup structured logging
@@ -33,6 +42,11 @@ func main() {
 		logLevel = logging.DEBUG
 	}
 	logging.SetLevel(logLevel)
+
+	// In stdio mode, redirect logs to stderr (stdout reserved for MCP messages)
+	if !*httpMode {
+		log.SetOutput(os.Stderr)
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -76,6 +90,23 @@ func main() {
 	}
 
 	handler := mcp.NewHandler(searchAgent)
+
+	// Mode selection: stdio (default) or HTTP
+	if !*httpMode {
+		// Stdio mode: read from stdin, write to stdout
+		logging.Info(ctx, "Starting server in stdio mode")
+		if err := handler.ServeStdio(ctx); err != nil {
+			logging.Fatal(ctx, "Stdio server error", map[string]interface{}{
+				"error": err.Error(),
+			})
+		}
+		return
+	}
+
+	// HTTP mode: start HTTP server
+	logging.Info(ctx, "Starting server in HTTP mode", map[string]interface{}{
+		"port": port,
+	})
 
 	mux := http.NewServeMux()
 
