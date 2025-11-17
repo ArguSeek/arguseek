@@ -12,10 +12,16 @@
 //     export ARGUSEEK_DEV_URL="https://your-dev-instance.example.com"
 //     export ARGUSEEK_PROD_URL="https://your-prod-instance.example.com"
 //
+//   For local testing, set the required API keys:
+//     export GOOGLE_API_KEY="your-google-api-key"
+//     export GOOGLE_CSE_ID="your-google-cse-id"
+//     export GEMINI_API_KEY="your-gemini-api-key" # Optional
+//
 // Usage:
-//   go run qa-harness.go [dev|prod]
+//   go run qa-harness.go [local|dev|prod|compare]
 //
 // Examples:
+//   go run qa-harness.go local  # Auto-start local server and run tests
 //   go run qa-harness.go dev    # Run against development environment
 //   go run qa-harness.go prod   # Run against production environment
 //
@@ -35,10 +41,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -56,6 +66,11 @@ const (
 	// Test configuration
 	CONCURRENT_QUERIES = 2
 	REQUEST_TIMEOUT    = 90 * time.Second
+
+	// Local server configuration
+	SERVER_STARTUP_TIMEOUT = 30 * time.Second
+	SERVER_SHUTDOWN_TIMEOUT = 10 * time.Second
+	HEALTH_CHECK_INTERVAL = 500 * time.Millisecond
 )
 
 // Environment represents a test environment configuration
@@ -79,6 +94,17 @@ type MCPResponse struct {
 	ID      int             `json:"id"`
 	Result  json.RawMessage `json:"result,omitempty"`
 	Error   *MCPError       `json:"error,omitempty"`
+}
+
+// MCPContentBlock represents a content block in MCP tool response
+type MCPContentBlock struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
+// MCPToolResult represents the MCP tool call result structure
+type MCPToolResult struct {
+	Content []MCPContentBlock `json:"content"`
 }
 
 // MCPError represents an MCP error
@@ -177,7 +203,7 @@ func main() {
 	log.Println("===========================================")
 
 	if len(os.Args) < 2 {
-		log.Fatal("Usage: go run qa-harness.go [dev|prod|compare]")
+		log.Fatal("Usage: go run qa-harness.go [local|dev|prod|compare]")
 	}
 
 	command := strings.ToLower(os.Args[1])
@@ -189,7 +215,49 @@ func main() {
 		return
 	}
 
-	// Normal test mode
+	// Handle local mode with server lifecycle management
+	if command == "local" {
+		log.Println("Local mode - starting server automatically")
+
+		// Start local server
+		port, cmd, err := startLocalServer()
+		if err != nil {
+			log.Fatalf("Failed to start local server: %v", err)
+		}
+
+		// Ensure server is always stopped on exit
+		defer func() {
+			if err := stopLocalServer(cmd); err != nil {
+				log.Printf("Warning: Error stopping server: %v", err)
+			}
+		}()
+
+		// Wait for server to be ready
+		if err := waitForServerReady(port); err != nil {
+			log.Fatalf("Server failed to start: %v", err)
+		}
+
+		// Create environment with dynamic URL
+		env := Environment{
+			Name:      "local",
+			BaseURL:   fmt.Sprintf("http://localhost:%d", port),
+			HealthURL: fmt.Sprintf("http://localhost:%d/health", port),
+		}
+
+		log.Printf("Testing against %s environment", strings.ToUpper(env.Name))
+		log.Printf("Base URL: %s", env.BaseURL)
+		log.Println()
+
+		// Run comprehensive test suite
+		report := runComprehensiveTests(env)
+
+		// Generate and display report
+		displayReport(report)
+		saveReport(env, report)
+		return
+	}
+
+	// Normal test mode for dev/prod
 	env := getEnvironment(command)
 
 	log.Printf("Testing against %s environment", strings.ToUpper(env.Name))
@@ -208,6 +276,8 @@ func getEnvironment(name string) Environment {
 	var baseURL string
 	var envName string
 
+	// Note: "local" mode does not use this function - it constructs Environment
+	// inline after starting the server (see main() function)
 	switch name {
 	case "dev":
 		envName = "development"
@@ -230,7 +300,7 @@ func getEnvironment(name string) Environment {
 			log.Fatal("ERROR: ARGUSEEK_PROD_URL environment variable not set. Example: export ARGUSEEK_PROD_URL='https://your-prod-instance.example.com'")
 		}
 	default:
-		log.Fatalf("Unknown environment: %s. Use 'dev' or 'prod'", name)
+		log.Fatalf("Unknown environment: %s. Use 'local', 'dev', or 'prod'", name)
 		return Environment{}
 	}
 
@@ -800,12 +870,15 @@ func executeTest(env Environment, tc TestCase) TestResult {
 			// This test expected an error but got success - this is a failure
 			result.Error = fmt.Errorf("Expected error (code %d) but got successful response", tc.ExpectedErrorCode)
 		} else {
-			// Normal success case - parse the response
-			var responseStr string
-			if err := json.Unmarshal(resp.Result, &responseStr); err != nil {
-				result.Error = fmt.Errorf("failed to parse response: %v", err)
+			// Normal success case - parse the MCP-compliant response
+			var toolResult MCPToolResult
+			if err := json.Unmarshal(resp.Result, &toolResult); err != nil {
+				result.Error = fmt.Errorf("failed to parse MCP tool result: %v", err)
+			} else if len(toolResult.Content) == 0 {
+				result.Error = fmt.Errorf("MCP tool result has no content blocks")
 			} else {
-				result.Response = responseStr
+				// Extract text from first content block
+				result.Response = toolResult.Content[0].Text
 			}
 		}
 	}
@@ -1101,6 +1174,156 @@ func stringPtr(s string) *string {
 	return &s
 }
 
+// findProjectRoot walks up the directory tree to find the project root (directory containing go.mod)
+func findProjectRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("could not get working directory: %v", err)
+	}
+
+	// Walk up the directory tree looking for go.mod
+	for {
+		goModPath := filepath.Join(dir, "go.mod")
+		if _, err := os.Stat(goModPath); err == nil {
+			return dir, nil
+		}
+
+		// Move to parent directory
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			// Reached filesystem root without finding go.mod
+			return "", fmt.Errorf("could not find project root (no go.mod found)")
+		}
+		dir = parent
+	}
+}
+
+// validateAPIKeys checks that required API keys are present in the environment
+func validateAPIKeys() error {
+	googleAPIKey := os.Getenv("GOOGLE_API_KEY")
+	if googleAPIKey == "" {
+		return fmt.Errorf("GOOGLE_API_KEY environment variable is required")
+	}
+
+	googleCSEID := os.Getenv("GOOGLE_CSE_ID")
+	if googleCSEID == "" {
+		return fmt.Errorf("GOOGLE_CSE_ID environment variable is required")
+	}
+
+	// GEMINI_API_KEY is optional - server will use GOOGLE_API_KEY as fallback
+	log.Println("✓ Required API keys are present")
+	return nil
+}
+
+// findAvailablePort finds an available port by letting the OS assign one
+func findAvailablePort() (int, error) {
+	// Let OS assign any available port (most robust, avoids race conditions)
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		return 0, fmt.Errorf("failed to find available port: %v", err)
+	}
+	defer listener.Close()
+
+	addr := listener.Addr().(*net.TCPAddr)
+	return addr.Port, nil
+}
+
+// startLocalServer starts the ArguSeek server as a subprocess
+func startLocalServer() (int, *exec.Cmd, error) {
+	log.Println("Starting local ArguSeek server...")
+
+	// Validate API keys first
+	if err := validateAPIKeys(); err != nil {
+		return 0, nil, err
+	}
+
+	// Find available port
+	port, err := findAvailablePort()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	// Find project root for portable path resolution
+	projectRoot, err := findProjectRoot()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	// Build absolute path to server
+	serverPath := filepath.Join(projectRoot, "cmd", "server", "main.go")
+
+	// Start server process
+	cmd := exec.Command("go", "run", serverPath)
+	cmd.Dir = projectRoot // Run from project root so imports resolve
+	cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", port))
+
+	// Capture stdout and stderr for debugging
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Start(); err != nil {
+		return 0, nil, fmt.Errorf("failed to start server: %v", err)
+	}
+
+	log.Printf("✓ Server process started (PID: %d, Port: %d)", cmd.Process.Pid, port)
+	return port, cmd, nil
+}
+
+// waitForServerReady polls the health endpoint until server is ready
+func waitForServerReady(port int) error {
+	healthURL := fmt.Sprintf("http://localhost:%d/health", port)
+	log.Printf("Waiting for server to be ready at %s...", healthURL)
+
+	deadline := time.Now().Add(SERVER_STARTUP_TIMEOUT)
+	for time.Now().Before(deadline) {
+		resp, err := http.Get(healthURL)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			resp.Body.Close()
+			log.Println("✓ Server is ready")
+			return nil
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		time.Sleep(HEALTH_CHECK_INTERVAL)
+	}
+
+	return fmt.Errorf("server did not become ready within %v", SERVER_STARTUP_TIMEOUT)
+}
+
+// stopLocalServer gracefully shuts down the server
+func stopLocalServer(cmd *exec.Cmd) error {
+	if cmd == nil || cmd.Process == nil {
+		return nil
+	}
+
+	log.Printf("Shutting down server (PID: %d)...", cmd.Process.Pid)
+
+	// Send SIGTERM for graceful shutdown
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		log.Printf("Failed to send SIGTERM: %v, attempting SIGKILL", err)
+		return cmd.Process.Kill()
+	}
+
+	// Wait for process to exit with timeout
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	select {
+	case <-done:
+		log.Println("✓ Server stopped gracefully")
+		return nil
+	case <-time.After(SERVER_SHUTDOWN_TIMEOUT):
+		log.Println("Server did not stop gracefully, forcing shutdown...")
+		if err := cmd.Process.Kill(); err != nil {
+			return fmt.Errorf("failed to kill server: %v", err)
+		}
+		return nil
+	}
+}
+
 // runContentProcessorValidation validates the new content processing pipeline
 func runContentProcessorValidation() {
 	log.Println("\n=== Content Processor Validation ===")
@@ -1211,9 +1434,17 @@ func runContentProcessorValidation() {
 			continue
 		}
 
-		// Extract result as string
-		var result string
-		json.Unmarshal(mpcResp.Result, &result)
+		// Extract result from MCP-compliant format
+		var toolResult MCPToolResult
+		if err := json.Unmarshal(mpcResp.Result, &toolResult); err != nil {
+			log.Printf("   ❌ Failed to parse MCP tool result: %v", err)
+			continue
+		}
+		if len(toolResult.Content) == 0 {
+			log.Printf("   ❌ MCP tool result has no content blocks")
+			continue
+		}
+		result := toolResult.Content[0].Text
 
 		// Run validation
 		if tc.validation(result) {
