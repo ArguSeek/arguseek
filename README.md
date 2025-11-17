@@ -148,11 +148,52 @@ Your ArguSeek instance is now running locally.
 
 ## Connecting AI Clients
 
-Once your ArguSeek server is running, connect your AI CLI tool to access the research capabilities.
+ArguSeek supports two transport modes to connect with your AI clients:
 
-### Direct HTTP Integration (Recommended)
+1. **Stdio mode (default)**: Direct subprocess integration via stdin/stdout
+2. **HTTP mode**: HTTP server for remote deployments and Docker containers
 
-Modern AI CLIs support direct HTTP connections to MCP servers—**no bridge needed**.
+### Native Stdio Integration (Recommended for Local Use)
+
+The simplest way to connect MCP clients like Claude Code CLI. ArguSeek runs as a subprocess and communicates via stdin/stdout.
+
+**Configuration for Claude Code CLI:**
+```bash
+claude mcp add arguseek ./server
+```
+
+**Configuration for Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "arguseek": {
+      "command": "/path/to/arguseek/server",
+      "env": {
+        "GOOGLE_API_KEY": "your-key",
+        "GOOGLE_CSE_ID": "your-cse-id",
+        "GEMINI_API_KEY": "your-gemini-key"
+      }
+    }
+  }
+}
+```
+
+**Benefits of stdio mode:**
+- No network configuration required
+- No port conflicts
+- Automatic process lifecycle management by the client
+- Simplest setup for local development
+
+### HTTP Mode (For Remote Deployments)
+
+Use the `-http` flag to run ArguSeek as an HTTP server. This is required for Docker containers and remote deployments.
+
+**Start in HTTP mode:**
+```bash
+./server -http
+```
+
+Modern AI CLIs support direct HTTP connections to MCP servers.
 
 #### Claude Code CLI
 
@@ -234,83 +275,43 @@ ArguSeek implements **basic HTTP request-response transport** for MCP protocol v
 - Synchronous request-response pattern (no Server-Sent Events or streaming)
 - Compatible with modern MCP clients that support HTTP transport
 
-### Legacy Stdio Bridge (Optional)
-
-**Note**: Claude Code CLI and modern MCP clients now support direct HTTP transport. The stdio bridge is only needed for older clients.
-
-Older clients that only support stdio communication (like legacy Claude Desktop) require the `http-mcp-client.js` bridge to connect to ArguSeek's HTTP server.
-
-**Prerequisites:**
-1. ArguSeek HTTP server running (from Quick Start above)
-2. Node.js 14+
-
-**Configuration for Claude Desktop:**
-
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "arguseek": {
-      "command": "node",
-      "args": ["/absolute/path/to/arguseek/http-mcp-client.js"],
-      "env": {
-        "ARGUSEEK_URL": "http://localhost:8080"
-      }
-    }
-  }
-}
-```
-
-Restart Claude Desktop to load the MCP server.
-
-**When to use the bridge:**
-- Your client only supports stdio transport (legacy clients)
-- You're using older Claude Desktop versions
-
-**When NOT to use the bridge:**
-- Modern CLI tools (Claude Code, Copilot, Codex) support direct HTTP
-- Using the direct HTTP connection is simpler and more performant
-
 ## Architecture
 
 ArguSeek implements a layered MCP-based architecture optimized for concurrent execution and bias-aware synthesis:
 
 ```
 ┌─────────────────────────────────────────┐
-│      Modern AI CLIs (Direct HTTP)       │
-│  Claude Code, Copilot, Codex            │
+│      AI CLIs (HTTP or Stdio)            │
+│  Claude Code, Copilot, Claude Desktop   │
 └───────────────┬─────────────────────────┘
-                │ HTTP/JSON-RPC
+                │ HTTP/JSON-RPC or Stdio
                 │
-    ┌───────────┴──────────┐
-    │                      │
-    ▼                      ▼
-┌─────────┐    ┌─────────────────────────┐
-│ Legacy  │    │   ArguSeek MCP Server   │
-│ Clients │───▶│   (Open-by-Default)     │
-│ (stdio) │    │   :8080/mcp             │
-└─────────┘    │                         │
-    │          │  ┌───────────────────┐  │
-    │          │  │  Research Agent   │  │
-    └──Bridge──┤  │  - Query opt (LLM)│  │
-               │  │  - Parallel search│  │
-               │  │  - Bias detection │  │
-               │  │  - Synthesis      │  │
-               │  └───────────────────┘  │
-               └──────────┬──────────────┘
-                          │
-            ┌─────────────┼─────────────┐
-            ▼             ▼             ▼
-     ┌──────────┐  ┌──────────┐  ┌──────────┐
-     │  Google  │  │  Gemini  │  │   Web    │
-     │  Search  │  │   API    │  │  Fetch   │
-     └──────────┘  └──────────┘  └──────────┘
+                ▼
+┌─────────────────────────────────────────┐
+│       ArguSeek MCP Server               │
+│       (Open-by-Default)                 │
+│       :8080/mcp (HTTP) or stdio         │
+│                                         │
+│  ┌───────────────────────────────────┐ │
+│  │       Research Agent              │ │
+│  │  - Query optimization (LLM)       │ │
+│  │  - Parallel search execution      │ │
+│  │  - Bias detection & analysis      │ │
+│  │  - Intelligent synthesis          │ │
+│  └───────────────────────────────────┘ │
+└──────────────────┬──────────────────────┘
+                   │
+     ┌─────────────┼─────────────┐
+     ▼             ▼             ▼
+┌──────────┐  ┌──────────┐  ┌──────────┐
+│  Google  │  │  Gemini  │  │   Web    │
+│  Search  │  │   API    │  │  Fetch   │
+└──────────┘  └──────────┘  └──────────┘
 ```
 
 **Connection Paths:**
-- **Direct HTTP** (recommended): Modern CLIs connect directly to `:8080/mcp` endpoint
-- **Stdio Bridge** (legacy): Older clients use `http-mcp-client.js` to translate stdio ↔ HTTP
+- **HTTP mode**: Modern CLIs connect directly to `:8080/mcp` endpoint
+- **Stdio mode**: Clients spawn ArguSeek as subprocess, communicate via stdin/stdout
 
 ### Key Design Principles
 

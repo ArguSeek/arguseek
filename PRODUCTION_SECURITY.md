@@ -1,10 +1,49 @@
 # Production Security Guide
 
-ArguSeek is designed to be **open-by-default** for simplicity and ease of local development. The HTTP server does not include built-in authentication or authorization.
+ArguSeek is designed to be **open-by-default** for simplicity and ease of local development.
 
-**⚠️ For production deployments, you MUST add security controls externally.**
+**⚠️ For production deployments using HTTP mode, you MUST add security controls externally.**
 
-## Authentication Strategies
+## Transport Modes and Security
+
+ArguSeek supports two transport modes with different security characteristics:
+
+### Stdio Mode (Default)
+When running without the `-http` flag, ArguSeek communicates via stdin/stdout. This is the default and recommended mode for:
+- **Local development** with MCP clients like Claude Code CLI
+- **Subprocess integration** where the client manages the process lifecycle
+
+**Security characteristics:**
+- ✅ No network exposure (no open ports)
+- ✅ Process isolation managed by the client
+- ✅ No authentication needed (relies on OS-level process permissions)
+- ✅ Ideal for single-user local development
+
+**Security considerations for stdio mode:**
+- Ensure API keys in environment variables are protected at the OS level
+- The calling process has full access to ArguSeek's capabilities
+- Suitable for trusted local environments only
+
+### HTTP Mode (`-http` flag)
+When running with the `-http` flag, ArguSeek starts an HTTP server on port 8080. This mode is required for:
+- **Docker containers** (networking requires exposed ports)
+- **Remote deployments** (Cloud Run, VPS, etc.)
+- **Multi-client access** (multiple users or services)
+
+**Security characteristics:**
+- ⚠️ Network-exposed endpoint
+- ⚠️ No built-in authentication or authorization
+- ⚠️ Anyone with network access can use the server and consume API quota
+- ✅ Can be secured externally (see strategies below)
+
+**When to use HTTP mode:**
+- Deploying to cloud platforms (Cloud Run, AWS, Azure)
+- Using Docker Compose for team deployments
+- Need to share one ArguSeek instance across multiple clients
+
+## Authentication Strategies (HTTP Mode Only)
+
+The following authentication strategies apply only when running ArguSeek in HTTP mode with the `-http` flag.
 
 ### Option 1: Reverse Proxy Authentication
 
