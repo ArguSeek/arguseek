@@ -25,5 +25,6 @@ COPY --from=builder /app/server /server
 # Expose port
 EXPOSE 8080
 
-# Run the binary
+# Run the binary in HTTP mode (required for Docker networking)
 ENTRYPOINT ["/server"]
+CMD ["-http"]
