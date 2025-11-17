@@ -9,7 +9,7 @@ const readline = require('readline');
 const fetch = require('node-fetch');
 
 // Configuration from environment variables
-const ARGUSEEK_URL = process.env.ARGUSEEK_URL || 'https://arguseek-prod-4psitcfpnq-uc.a.run.app/mcp';
+const ARGUSEEK_URL = process.env.ARGUSEEK_URL || 'http://localhost:8080/mcp';
 
 // Server info
 const SERVER_INFO = {
@@ -133,6 +133,11 @@ function handleRequest(request) {
         sendResponse(req.id, initResult);
         break;
 
+      case 'notifications/initialized':
+        // MCP protocol notification - no response needed
+        console.error('Received initialized notification');
+        break;
+
       case 'tools/list':
         // Forward to remote server
         const listPayload = {
@@ -166,14 +171,8 @@ function handleRequest(request) {
         makeHttpRequest(callPayload)
           .then(response => {
             if (response.result) {
-              sendResponse(req.id, {
-                content: [
-                  {
-                    type: 'text',
-                    text: typeof response.result === 'string' ? response.result : JSON.stringify(response.result, null, 2)
-                  }
-                ]
-              });
+              // Server now returns MCP-compliant format, pass through directly
+              sendResponse(req.id, response.result);
             } else if (response.error) {
               sendResponse(req.id, null, response.error);
             } else {
