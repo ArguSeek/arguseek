@@ -146,37 +146,171 @@ This reduces hallucination—the agent reports missing information instead of gu
 
 Your ArguSeek instance is now running locally.
 
+## Connecting AI Clients
+
+Once your ArguSeek server is running, connect your AI CLI tool to access the research capabilities.
+
+### Direct HTTP Integration (Recommended)
+
+Modern AI CLIs support direct HTTP connections to MCP servers—**no bridge needed**.
+
+#### Claude Code CLI
+
+**For local development:**
+```bash
+claude mcp add --transport http arguseek http://localhost:8080/mcp
+```
+
+**For remote deployments with authentication:**
+```bash
+claude mcp add --transport http arguseek https://your-domain.com/mcp
+```
+
+#### GitHub Copilot / VS Code
+
+Add to `.vscode/mcp.json` (workspace) or user settings:
+
+```json
+{
+  "mcpServers": {
+    "arguseek": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp"
+    }
+  }
+}
+```
+
+For remote servers with authentication, add `headers`:
+```json
+{
+  "mcpServers": {
+    "arguseek": {
+      "type": "http",
+      "url": "https://your-domain.com/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_TOKEN"
+      }
+    }
+  }
+}
+```
+
+#### OpenAI Codex CLI
+
+Add to `~/.codex/config.toml`:
+
+```toml
+[mcp.servers.arguseek]
+url = "http://localhost:8080/mcp"
+```
+
+For authenticated remote servers:
+```toml
+[mcp.servers.arguseek]
+url = "https://your-domain.com/mcp"
+bearer_token = "YOUR_TOKEN"
+
+# For OAuth (requires rmcp_client feature)
+[features]
+rmcp_client = true
+```
+
+#### OAuth Discovery Endpoint
+
+ArguSeek exposes `/.well-known/oauth-authorization-server` for compatibility with OAuth-aware MCP clients. This endpoint returns minimal metadata to signal that **no authentication is required** for local development.
+
+**For production deployments:**
+- Set the `OAUTH_ISSUER` environment variable to your service's public URL
+- Implement authentication externally (see [PRODUCTION_SECURITY.md](PRODUCTION_SECURITY.md))
+- Example: `export OAUTH_ISSUER="https://arguseek.example.com"`
+
+**Note:** This endpoint is informational only. ArguSeek does not implement OAuth flows. Secure production deployments using reverse proxy authentication, Cloud Run IAM, or API Gateway.
+
+#### Transport Details
+
+ArguSeek implements **basic HTTP request-response transport** for MCP protocol version 2024-11-05:
+- Single endpoint: `POST /mcp` for all JSON-RPC messages
+- Synchronous request-response pattern (no Server-Sent Events or streaming)
+- Compatible with modern MCP clients that support HTTP transport
+
+### Legacy Stdio Bridge (Optional)
+
+**Note**: Claude Code CLI and modern MCP clients now support direct HTTP transport. The stdio bridge is only needed for older clients.
+
+Older clients that only support stdio communication (like legacy Claude Desktop) require the `http-mcp-client.js` bridge to connect to ArguSeek's HTTP server.
+
+**Prerequisites:**
+1. ArguSeek HTTP server running (from Quick Start above)
+2. Node.js 14+
+
+**Configuration for Claude Desktop:**
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "arguseek": {
+      "command": "node",
+      "args": ["/absolute/path/to/arguseek/http-mcp-client.js"],
+      "env": {
+        "ARGUSEEK_URL": "http://localhost:8080"
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop to load the MCP server.
+
+**When to use the bridge:**
+- Your client only supports stdio transport (legacy clients)
+- You're using older Claude Desktop versions
+
+**When NOT to use the bridge:**
+- Modern CLI tools (Claude Code, Copilot, Codex) support direct HTTP
+- Using the direct HTTP connection is simpler and more performant
+
 ## Architecture
 
 ArguSeek implements a layered MCP-based architecture optimized for concurrent execution and bias-aware synthesis:
 
 ```
 ┌─────────────────────────────────────────┐
-│         AI Agent (Claude)                │
-│         via MCP Protocol                 │
+│      Modern AI CLIs (Direct HTTP)       │
+│  Claude Code, Copilot, Codex            │
 └───────────────┬─────────────────────────┘
                 │ HTTP/JSON-RPC
-                ▼
-┌─────────────────────────────────────────┐
-│       ArguSeek MCP Server                │
-│      (Open-by-Default)                   │
-│                                          │
-│  ┌─────────────────────────────────┐    │
-│  │      Research Agent              │    │
-│  │   - Query optimization (LLM)     │    │
-│  │   - Parallel search execution    │    │
-│  │   - Bias detection               │    │
-│  │   - Content synthesis            │    │
-│  └─────────────────────────────────┘    │
-└───────────┬─────────────────────────────┘
-            │
-            ├──────────────┬──────────────┐
-            ▼              ▼              ▼
-     ┌──────────┐   ┌──────────┐   ┌──────────┐
-     │  Google  │   │  Gemini  │   │   Web    │
-     │  Search  │   │   API    │   │  Fetch   │
-     └──────────┘   └──────────┘   └──────────┘
+                │
+    ┌───────────┴──────────┐
+    │                      │
+    ▼                      ▼
+┌─────────┐    ┌─────────────────────────┐
+│ Legacy  │    │   ArguSeek MCP Server   │
+│ Clients │───▶│   (Open-by-Default)     │
+│ (stdio) │    │   :8080/mcp             │
+└─────────┘    │                         │
+    │          │  ┌───────────────────┐  │
+    │          │  │  Research Agent   │  │
+    └──Bridge──┤  │  - Query opt (LLM)│  │
+               │  │  - Parallel search│  │
+               │  │  - Bias detection │  │
+               │  │  - Synthesis      │  │
+               │  └───────────────────┘  │
+               └──────────┬──────────────┘
+                          │
+            ┌─────────────┼─────────────┐
+            ▼             ▼             ▼
+     ┌──────────┐  ┌──────────┐  ┌──────────┐
+     │  Google  │  │  Gemini  │  │   Web    │
+     │  Search  │  │   API    │  │  Fetch   │
+     └──────────┘  └──────────┘  └──────────┘
 ```
+
+**Connection Paths:**
+- **Direct HTTP** (recommended): Modern CLIs connect directly to `:8080/mcp` endpoint
+- **Stdio Bridge** (legacy): Older clients use `http-mcp-client.js` to translate stdio ↔ HTTP
 
 ### Key Design Principles
 
