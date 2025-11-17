@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -138,6 +139,47 @@ func wrapInContent(result interface{}) ToolCallResult {
 	}
 }
 
+// ProcessRequest handles the core MCP protocol logic independent of transport.
+// Returns a Response struct and error for transport-agnostic handling.
+func (h *Handler) ProcessRequest(ctx context.Context, req Request) (Response, error) {
+	// Validate protocol version
+	if req.JSONRPC != "2.0" {
+		return Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error: &Error{
+				Code:    -32600,
+				Message: "Invalid Request",
+			},
+		}, nil
+	}
+
+	switch req.Method {
+	case "initialize":
+		return h.processInitialize(req)
+	case "notifications/initialized":
+		// MCP protocol notification - client confirms initialization complete
+		// Per MCP spec: return success with no result for client notifications
+		return Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+		}, nil
+	case "tools/list":
+		return h.processToolsList(req)
+	case "tools/call":
+		return h.processToolsCall(ctx, req)
+	default:
+		return Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error: &Error{
+				Code:    -32601,
+				Message: "Method not found",
+			},
+		}, nil
+	}
+}
+
 // HandleRequest processes MCP requests without authentication or input validation.
 // This service is designed to be open-by-default for simplicity.
 //
@@ -158,28 +200,44 @@ func (h *Handler) HandleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.JSONRPC != "2.0" {
-		writeError(w, req.ID, -32600, "Invalid Request", http.StatusBadRequest)
+	// Process request using transport-agnostic logic
+	response, err := h.ProcessRequest(r.Context(), req)
+	if err != nil {
+		writeError(w, req.ID, -32603, fmt.Sprintf("Internal error: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	switch req.Method {
-	case "initialize":
-		h.handleInitialize(w, req)
-	case "notifications/initialized":
-		// MCP protocol notification - client confirms initialization complete
-		// Per MCP spec: server MUST return HTTP 202 Accepted with no body for client notifications
+	// For notifications/initialized, return 202 Accepted with no body
+	if req.Method == "notifications/initialized" {
 		w.WriteHeader(http.StatusAccepted)
-	case "tools/list":
-		h.handleToolsList(w, req)
-	case "tools/call":
-		h.handleToolsCall(w, r, req)
-	default:
-		writeError(w, req.ID, -32601, "Method not found", http.StatusNotFound)
+		return
 	}
+
+	// Return appropriate HTTP status based on error presence
+	statusCode := http.StatusOK
+	if response.Error != nil {
+		switch response.Error.Code {
+		case -32700:
+			statusCode = http.StatusBadRequest
+		case -32600:
+			statusCode = http.StatusBadRequest
+		case -32601:
+			statusCode = http.StatusNotFound
+		case -32602:
+			statusCode = http.StatusBadRequest
+		case -32603:
+			statusCode = http.StatusInternalServerError
+		default:
+			statusCode = http.StatusInternalServerError
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(response)
 }
 
-func (h *Handler) handleInitialize(w http.ResponseWriter, req Request) {
+func (h *Handler) processInitialize(req Request) (Response, error) {
 	result := InitializeResult{
 		ProtocolVersion: "2024-11-05",
 		Capabilities: Capabilities{
@@ -193,17 +251,14 @@ func (h *Handler) handleInitialize(w http.ResponseWriter, req Request) {
 		},
 	}
 
-	response := Response{
+	return Response{
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result:  result,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	}, nil
 }
 
-func (h *Handler) handleToolsList(w http.ResponseWriter, req Request) {
+func (h *Handler) processToolsList(req Request) (Response, error) {
 	tools := []Tool{
 		{
 			Name:        "research_iteratively",
@@ -247,84 +302,123 @@ func (h *Handler) handleToolsList(w http.ResponseWriter, req Request) {
 		Tools: tools,
 	}
 
-	response := Response{
+	return Response{
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result:  result,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	}, nil
 }
 
-func (h *Handler) handleToolsCall(w http.ResponseWriter, r *http.Request, req Request) {
+func (h *Handler) processToolsCall(ctx context.Context, req Request) (Response, error) {
 	// Parse the params as a tools/call request
 	paramsJSON, err := json.Marshal(req.Params)
 	if err != nil {
-		writeError(w, req.ID, -32602, "Invalid params", http.StatusBadRequest)
-		return
+		return Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error: &Error{
+				Code:    -32602,
+				Message: "Invalid params",
+			},
+		}, nil
 	}
 
 	var params Params
 	if err := json.Unmarshal(paramsJSON, &params); err != nil {
-		writeError(w, req.ID, -32602, "Invalid params", http.StatusBadRequest)
-		return
+		return Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error: &Error{
+				Code:    -32602,
+				Message: "Invalid params",
+			},
+		}, nil
 	}
 
 	switch params.Name {
 	case "research_iteratively":
 		// Validate query length (prevents ReDoS and resource exhaustion)
 		if err := validateQueryLength(params.Arguments.Query); err != nil {
-			writeError(w, req.ID, -32602, fmt.Sprintf("Invalid query: %v", err), http.StatusBadRequest)
-			return
+			return Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error: &Error{
+					Code:    -32602,
+					Message: fmt.Sprintf("Invalid query: %v", err),
+				},
+			}, nil
 		}
 		if params.Arguments.PreviousQuery != nil && *params.Arguments.PreviousQuery != "" {
 			if err := validateQueryLength(*params.Arguments.PreviousQuery); err != nil {
-				writeError(w, req.ID, -32602, fmt.Sprintf("Invalid previous query: %v", err), http.StatusBadRequest)
-				return
+				return Response{
+					JSONRPC: "2.0",
+					ID:      req.ID,
+					Error: &Error{
+						Code:    -32602,
+						Message: fmt.Sprintf("Invalid previous query: %v", err),
+					},
+				}, nil
 			}
 		}
 
-		result, err := h.agent.ResearchIteratively(r.Context(), params.Arguments.Query, params.Arguments.PreviousQuery)
+		result, err := h.agent.ResearchIteratively(ctx, params.Arguments.Query, params.Arguments.PreviousQuery)
 		if err != nil {
-			writeError(w, req.ID, -32603, fmt.Sprintf("Internal error: %v", err), http.StatusInternalServerError)
-			return
+			return Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error: &Error{
+					Code:    -32603,
+					Message: fmt.Sprintf("Internal error: %v", err),
+				},
+			}, nil
 		}
 
-		response := Response{
+		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Result:  wrapInContent(result),
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		}, nil
 
 	case "fetch_url":
 		// Validate URL (prevents SSRF attacks)
 		if err := validateURL(params.Arguments.URL); err != nil {
-			writeError(w, req.ID, -32602, fmt.Sprintf("Invalid URL: %v", err), http.StatusBadRequest)
-			return
+			return Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error: &Error{
+					Code:    -32602,
+					Message: fmt.Sprintf("Invalid URL: %v", err),
+				},
+			}, nil
 		}
 
-		result, err := h.agent.FetchURL(r.Context(), params.Arguments.URL, params.Arguments.LookingFor)
+		result, err := h.agent.FetchURL(ctx, params.Arguments.URL, params.Arguments.LookingFor)
 		if err != nil {
-			writeError(w, req.ID, -32603, fmt.Sprintf("Internal error: %v", err), http.StatusInternalServerError)
-			return
+			return Response{
+				JSONRPC: "2.0",
+				ID:      req.ID,
+				Error: &Error{
+					Code:    -32603,
+					Message: fmt.Sprintf("Internal error: %v", err),
+				},
+			}, nil
 		}
 
-		response := Response{
+		return Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Result:  wrapInContent(result),
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		}, nil
 
 	default:
-		writeError(w, req.ID, -32602, "Invalid params: unknown tool", http.StatusBadRequest)
-		return
+		return Response{
+			JSONRPC: "2.0",
+			ID:      req.ID,
+			Error: &Error{
+				Code:    -32602,
+				Message: "Invalid params: unknown tool",
+			},
+		}, nil
 	}
 }
 
