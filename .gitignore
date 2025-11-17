@@ -54,6 +54,7 @@ Thumbs.db
 /arguseek-server
 /deploy
 /debug-server
+/tools/qa-harness/qa-harness
 
 # Logs
 *.log
