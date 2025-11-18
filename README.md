@@ -1,9 +1,11 @@
-# ArguSeek
+<div align="center">
+  <img src="assets/logos/logo-full.svg" alt="ArguSeek" width="350">
 
-<p align="center">
-  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
-  <img src="https://img.shields.io/badge/100%25%20AI-Generated-ff69b4.svg" alt="100% AI Generated">
-</p>
+  <p>
+    <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+    <img src="https://img.shields.io/badge/100%25%20AI-Generated-ff69b4.svg" alt="100% AI Generated">
+  </p>
+</div>
 
 **Ground your AI agents in current reality**
 
@@ -56,20 +58,152 @@ fetch_url(url="https://docs.stripe.com/api/authentication", looking_for="authent
 fetch_url(url="https://github.com/vercel/next.js/releases/tag/v15.0.0", looking_for="breaking changes")
 ```
 
-## Installation & Compilation
+## Installation
 
 ### Prerequisites
 - Go 1.23 or higher
-- API keys: [Google Custom Search](https://developers.google.com/custom-search/v1/introduction), [Google CSE ID](https://programmablesearchengine.google.com/), [Gemini API](https://ai.google.dev/)
+- Google API key and Custom Search Engine ID (required)
+- Gemini API key (optional, defaults to Google API key if not set)
 
-### Option 1: Build from Source (Recommended)
+> See [Configuration](#configuration) section below for detailed API key setup links.
 
-**Mac (Intel or Apple Silicon):**
+### Quick Start
+
 ```bash
-make build          # Creates ./bin/server
-./bin/server        # Stdio mode (default)
-./bin/server -http  # HTTP mode
+# 1. Clone and build
+git clone https://github.com/yourusername/arguseek.git
+cd arguseek
+make install
+
+# 2. Set required environment variables
+export GOOGLE_API_KEY="your-google-api-key"
+export GOOGLE_CSE_ID="your-custom-search-engine-id"
+# Optional: export GEMINI_API_KEY="your-gemini-key"  # Defaults to GOOGLE_API_KEY if not set
+
+# 3. Run the server
+arguseek        # Stdio mode (for local MCP clients)
+# OR
+arguseek -http  # HTTP mode (for remote clients, runs on port 8080)
 ```
+
+> **Note:** For local build without installation, user-local installation, or platform-specific builds, see [Advanced Installation Options](#advanced-installation-options) below.
+
+## Connecting AI Clients
+
+ArguSeek supports two transport modes:
+
+- **Stdio mode (default)**: Direct subprocess integration for local development
+- **HTTP mode (`-http` flag)**: HTTP server for remote deployments
+
+### Stdio Mode (Local Installation)
+
+**Claude Code CLI:**
+```bash
+# Default (global install)
+claude mcp add arguseek arguseek
+
+# Alternative (local build without install)
+claude mcp add arguseek ./bin/server
+```
+
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "arguseek": {
+      "command": "arguseek",  // default: global install, or use "/path/to/arguseek/bin/server" for local build
+      "env": {
+        "GOOGLE_API_KEY": "your-key",
+        "GOOGLE_CSE_ID": "your-cse-id",
+        "GEMINI_API_KEY": "your-gemini-key"  // optional: defaults to GOOGLE_API_KEY if omitted
+      }
+    }
+  }
+}
+```
+
+### HTTP Mode (Remote Deployments)
+
+Start server: `arguseek -http` (default) or `./bin/server -http` (local build)
+
+**Claude Code CLI:**
+```bash
+claude mcp add --transport http arguseek http://localhost:8080/mcp
+```
+
+**VS Code / GitHub Copilot** (`.vscode/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "arguseek": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp"
+    }
+  }
+}
+```
+
+## Architecture
+
+ArguSeek implements dual-transport MCP architecture with transport-agnostic core logic.
+
+```
+┌─────────────────────────────────────────┐
+│      AI CLIs (HTTP or Stdio)            │
+│  Claude Code, Copilot, Claude Desktop   │
+└───────────────┬─────────────────────────┘
+                │ HTTP/JSON-RPC or Stdio
+                ▼
+┌─────────────────────────────────────────┐
+│       ArguSeek MCP Server               │
+│       :8080/mcp (HTTP) or stdio         │
+│                                         │
+│  ┌───────────────────────────────────┐  │
+│  │       Research Agent              │  │
+│  │  - Query optimization (LLM)       │  │
+│  │  - Parallel search execution      │  │
+│  │  - Bias detection & synthesis     │  │
+│  └───────────────────────────────────┘  │
+└──────────────────┬──────────────────────┘
+                   │
+     ┌─────────────┼─────────────┐
+     ▼             ▼             ▼
+┌──────────┐  ┌──────────┐  ┌──────────┐
+│  Google  │  │  Gemini  │  │   Web    │
+│  Search  │  │   API    │  │  Fetch   │
+└──────────┘  └──────────┘  └──────────┘
+```
+
+**Key technical details:**
+- **Query optimization**: Single query → 2-3 complementary searches via LLM
+- **Parallel execution**: Concurrent searches and content fetching (~10s vs 19s serial)
+- **Fallback mechanisms**: Two-phase URL fetching guarantees 12+ sources (15 primary + 15 backup)
+- **Bias detection**: Pattern analysis identifies promotional content with counter-query suggestions
+
+## Advanced Installation Options
+
+### Local Build (Without Installation)
+
+Build the server binary without installing it globally:
+
+```bash
+make build
+# Creates ./bin/server in the project directory
+# Run with: ./bin/server or ./bin/server -http
+```
+
+### User-local Installation
+
+Install to your home directory without requiring sudo:
+
+```bash
+make install-user
+# Installs to ~/bin/arguseek
+# Ensure ~/bin is in your PATH: export PATH="$HOME/bin:$PATH"
+# Run from anywhere: arguseek or arguseek -http
+```
+
+### Platform-Specific Builds
 
 **Linux:**
 ```bash
@@ -100,132 +234,53 @@ GOOS=linux GOARCH=amd64 go build -o server-linux ./cmd/server
 GOOS=windows GOARCH=amd64 go build -o server.exe ./cmd/server
 ```
 
-### Option 2: Development
+### Development Setup
 
 ```bash
 go mod download
 cp .env.example .env
-# Edit .env with API keys
+# Edit .env with your API keys:
+#   GOOGLE_API_KEY (required)
+#   GOOGLE_CSE_ID (required)
+#   GEMINI_API_KEY (optional, defaults to GOOGLE_API_KEY)
 go run cmd/server/main.go        # Stdio mode
 go run cmd/server/main.go -http  # HTTP mode
 go test ./...                    # Run tests
 ```
 
-## Connecting AI Clients
-
-ArguSeek supports two transport modes:
-
-- **Stdio mode (default)**: Direct subprocess integration for local development
-- **HTTP mode (`-http` flag)**: HTTP server for remote deployments
-
-### Stdio Mode (Local Development)
-
-**Claude Code CLI:**
-```bash
-claude mcp add arguseek ./server
-```
-
-**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
-```json
-{
-  "mcpServers": {
-    "arguseek": {
-      "command": "/path/to/arguseek/server",
-      "env": {
-        "GOOGLE_API_KEY": "your-key",
-        "GOOGLE_CSE_ID": "your-cse-id",
-        "GEMINI_API_KEY": "your-gemini-key"
-      }
-    }
-  }
-}
-```
-
-### HTTP Mode (Remote Deployments)
-
-Start server: `./server -http`
-
-**Claude Code CLI:**
-```bash
-claude mcp add --transport http arguseek http://localhost:8080/mcp
-```
-
-**VS Code / GitHub Copilot** (`.vscode/mcp.json`):
-```json
-{
-  "mcpServers": {
-    "arguseek": {
-      "type": "http",
-      "url": "http://localhost:8080/mcp"
-    }
-  }
-}
-```
-
-For authenticated remote servers, add `headers`:
-```json
-{
-  "mcpServers": {
-    "arguseek": {
-      "type": "http",
-      "url": "https://your-domain.com/mcp",
-      "headers": {"Authorization": "Bearer YOUR_TOKEN"}
-    }
-  }
-}
-```
-
-## Architecture
-
-ArguSeek implements dual-transport MCP architecture with transport-agnostic core logic.
-
-```
-┌─────────────────────────────────────────┐
-│      AI CLIs (HTTP or Stdio)            │
-│  Claude Code, Copilot, Claude Desktop   │
-└───────────────┬─────────────────────────┘
-                │ HTTP/JSON-RPC or Stdio
-                ▼
-┌─────────────────────────────────────────┐
-│       ArguSeek MCP Server               │
-│       :8080/mcp (HTTP) or stdio         │
-│                                         │
-│  ┌───────────────────────────────────┐ │
-│  │       Research Agent              │ │
-│  │  - Query optimization (LLM)       │ │
-│  │  - Parallel search execution      │ │
-│  │  - Bias detection & synthesis     │ │
-│  └───────────────────────────────────┘ │
-└──────────────────┬──────────────────────┘
-                   │
-     ┌─────────────┼─────────────┐
-     ▼             ▼             ▼
-┌──────────┐  ┌──────────┐  ┌──────────┐
-│  Google  │  │  Gemini  │  │   Web    │
-│  Search  │  │   API    │  │  Fetch   │
-└──────────┘  └──────────┘  └──────────┘
-```
-
-**Key technical details:**
-- **Query optimization**: Single query → 2-3 complementary searches via LLM
-- **Parallel execution**: Concurrent searches and content fetching (~10s vs 19s serial)
-- **Fallback mechanisms**: Two-phase URL fetching guarantees 12+ sources (15 primary + 15 backup)
-- **Bias detection**: Pattern analysis identifies promotional content with counter-query suggestions
-
 ## Configuration
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GOOGLE_API_KEY` | Yes | Google Custom Search API key |
-| `GOOGLE_CSE_ID` | Yes | Google Custom Search Engine ID |
-| `GEMINI_API_KEY` | No | Gemini API key (defaults to GOOGLE_API_KEY) |
+| `GOOGLE_API_KEY` | Yes | [Google Custom Search API key](https://developers.google.com/custom-search/v1/introduction) |
+| `GOOGLE_CSE_ID` | Yes | [Google Custom Search Engine ID](https://programmablesearchengine.google.com/) |
+| `GEMINI_API_KEY` | No | [Gemini API key](https://ai.google.dev/) (defaults to GOOGLE_API_KEY) |
 | `PORT` | No | Server port (default: 8080) |
+
+**API Key Setup:**
+- Get your `GOOGLE_API_KEY`: [Google Custom Search API](https://developers.google.com/custom-search/v1/introduction)
+- Create your `GOOGLE_CSE_ID`: [Programmable Search Engine](https://programmablesearchengine.google.com/)
+- Get your `GEMINI_API_KEY` (optional): [Gemini API](https://ai.google.dev/)
 
 > **SECURITY:** ArguSeek has no built-in authentication. For local development, use `localhost:8080`. For production, secure with reverse proxy auth, Cloud Run IAM, or API gateway. See [PRODUCTION_SECURITY.md](PRODUCTION_SECURITY.md).
 
 ## License
 
 ArguSeek is released under the [MIT License](LICENSE).
+
+## Branding
+
+Logo assets are available in [`assets/logos/`](assets/logos/):
+- `logo-full.svg` - Primary wordmark with icon (350×64)
+- `logo-symbol.svg` - Icon only for favicons and small spaces (100×100)
+- `wordmark.svg` - Text only for horizontal layouts (240×50)
+- `favicon-*.svg` - Optimized favicons in multiple sizes
+
+**Color Palette:**
+- Primary: `#10B981` (Emerald Green) - knowledge, growth, open source
+- Accent: `#14B8A6` (Teal) - innovation, discovery, analysis
+
+For detailed usage guidelines and design specs, see [`assets/logos/showcase.jsx`](assets/logos/showcase.jsx).
 
 ---
 
