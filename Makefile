@@ -1,10 +1,12 @@
-.PHONY: help build test lint clean deploy-dev deploy-prod deploy-dev-dry deploy-prod-dry build-deploy
+.PHONY: help build test lint clean deploy-dev deploy-prod deploy-dev-dry deploy-prod-dry build-deploy install install-user
 
 # Default target
 help:
 	@echo "Available commands:"
 	@echo "  build         - Build the server binary"
 	@echo "  build-deploy  - Build the deploy tool"
+	@echo "  install       - Install to /usr/local/bin/arguseek (requires sudo)"
+	@echo "  install-user  - Install to ~/bin/arguseek (no sudo required)"
 	@echo "  test          - Run tests"
 	@echo "  lint          - Run linter"
 	@echo "  clean         - Clean build artifacts"
@@ -25,6 +27,21 @@ build:
 build-deploy:
 	go build -o bin/deploy cmd/deploy/main.go
 	chmod +x bin/deploy
+
+# Install targets
+install: build
+	@echo "Installing arguseek to /usr/local/bin..."
+	sudo cp bin/server /usr/local/bin/arguseek
+	@echo "✓ ArguSeek installed globally as 'arguseek'"
+	@echo "  Run 'arguseek' or 'arguseek -http' from anywhere"
+
+install-user: build
+	@echo "Installing arguseek to ~/bin..."
+	mkdir -p ~/bin
+	cp bin/server ~/bin/arguseek
+	@echo "✓ ArguSeek installed to ~/bin/arguseek"
+	@echo "  Make sure ~/bin is in your PATH"
+	@echo "  Add to ~/.zshrc or ~/.bashrc: export PATH=\"\$$HOME/bin:\$$PATH\""
 
 # Test and quality
 test:
