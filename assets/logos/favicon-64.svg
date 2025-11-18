@@ -1,0 +1,34 @@
+<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient64" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#14B8A6" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="28.8" fill="url(#gradient64)" opacity="0.1"/>
+
+  <!-- Magnifying glass handle -->
+  <path
+    d="M 41.6 41.6 L 51.2 51.2"
+    stroke="url(#gradient64)"
+    stroke-width="3.84"
+    stroke-linecap="round"
+  />
+
+  <!-- Main circle of magnifying glass -->
+  <circle
+    cx="28.8"
+    cy="28.8"
+    r="16"
+    stroke="url(#gradient64)"
+    stroke-width="3.84"
+    fill="none"
+  />
+
+  <!-- Three dots inside representing multiple sources -->
+  <circle cx="22.4" cy="25.6" r="1.92" fill="#14B8A6"/>
+  <circle cx="28.8" cy="28.8" r="1.92" fill="#14B8A6"/>
+  <circle cx="35.2" cy="32" r="1.92" fill="#14B8A6"/>
+</svg>

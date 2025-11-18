@@ -1,0 +1,6 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Simplified magnifying glass for 16x16 -->
+  <circle cx="6" cy="6" r="4" stroke="#10B981" stroke-width="1.5" fill="none"/>
+  <line x1="9" y1="9" x2="13" y2="13" stroke="#10B981" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="6" cy="6" r="1" fill="#14B8A6"/>
+</svg>
