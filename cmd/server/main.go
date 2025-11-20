@@ -14,6 +14,7 @@ import (
 	"arguseek/internal/agent"
 	"arguseek/internal/logging"
 	"arguseek/internal/mcp"
+	"arguseek/internal/version"
 )
 
 // ArguSeek MCP Server
@@ -32,7 +33,14 @@ import (
 func main() {
 	// Parse command-line flags
 	httpMode := flag.Bool("http", false, "run as HTTP server instead of stdio mode")
+	versionFlag := flag.Bool("version", false, "print version information and exit")
 	flag.Parse()
+
+	// Handle version flag
+	if *versionFlag {
+		fmt.Println(version.Version)
+		os.Exit(0)
+	}
 
 	ctx := context.Background()
 
@@ -151,7 +159,7 @@ func main() {
 		// Root path returns service info for discovery
 		if r.URL.Path == "/" {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{"service":"arguseek","version":"0.3.3","endpoints":["/health","/.well-known/oauth-authorization-server","/mcp"]}`)
+			fmt.Fprintf(w, `{"service":"arguseek","version":"%s","endpoints":["/health","/.well-known/oauth-authorization-server","/mcp"]}`, version.Version)
 			return
 		}
 

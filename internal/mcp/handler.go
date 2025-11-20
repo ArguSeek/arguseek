@@ -11,6 +11,7 @@ import (
 
 	"arguseek/internal/agent"
 	"arguseek/internal/request"
+	"arguseek/internal/version"
 )
 
 type Handler struct {
@@ -247,7 +248,7 @@ func (h *Handler) processInitialize(req Request) (Response, error) {
 		},
 		ServerInfo: ServerInfo{
 			Name:    "arguseek",
-			Version: "0.3.3",
+			Version: version.Version,
 		},
 	}
 
