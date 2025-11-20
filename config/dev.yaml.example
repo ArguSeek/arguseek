@@ -1,0 +1,39 @@
+# ArguSeek Development Environment Configuration
+# Copy this to dev.yaml and customize for your GCP project
+#
+# SECURITY WARNING: Automated deployment enables public access (allUsers) by default.
+# For production, configure IAM authentication or reverse proxy.
+# See: PRODUCTION_SECURITY.md
+
+# GCP Project Configuration
+project_id: "your-gcp-project-id"
+region: "us-central1"
+service_name: "arguseek-dev"
+
+# Service Account (optional)
+# If not specified, uses default compute service account
+service_account: ""
+
+# Google Custom Search Engine ID
+# Get this from: https://programmablesearchengine.google.com/
+google_cse_id: "your-custom-search-engine-id"
+
+# Cloud Run Runtime Configuration
+runtime:
+  # Memory allocation (e.g., "512Mi", "1Gi", "2Gi")
+  memory: "512Mi"
+
+  # CPU allocation (1-4 vCPUs)
+  cpu: 1
+
+  # Request timeout in seconds (max 3600)
+  timeout: 300
+
+  # Maximum concurrent requests per instance (1-1000)
+  concurrency: 80
+
+  # Minimum instances (0 for cost savings, 1+ for availability)
+  min_instances: 0
+
+  # Maximum instances (controls scaling and cost)
+  max_instances: 3
