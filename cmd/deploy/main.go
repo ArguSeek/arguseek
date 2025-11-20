@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"arguseek/internal/version"
 	"gopkg.in/yaml.v3"
 )
 
@@ -347,8 +348,16 @@ func runPreDeploymentSetup(env string) error {
 func buildAndPush(config *Config) error {
 	imageName := fmt.Sprintf("gcr.io/%s/%s:latest", config.ProjectID, config.ServiceName)
 
-	// Build image
-	cmd := exec.Command("docker", "build", "--platform", "linux/amd64", "-t", imageName, ".")
+	// Get version from single source of truth (version package)
+	ver := version.Version
+	fmt.Printf("Building Docker image with version: %s\n", ver)
+
+	// Build image with version injection
+	cmd := exec.Command("docker", "build",
+		"--platform", "linux/amd64",
+		"--build-arg", fmt.Sprintf("VERSION=%s", ver),
+		"-t", imageName,
+		".")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {

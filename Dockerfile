@@ -10,8 +10,17 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o server cmd/server/main.go
+# Build argument for version injection
+# Default "development" is used for local/manual builds without --build-arg VERSION=...
+# Automated deployments (cmd/deploy/main.go) inject the actual version from git tags
+# Example: docker build --build-arg VERSION=v1.2.3 -t arguseek .
+ARG VERSION=development
+
+# Build the binary with version injection
+# IMPORTANT: ldflags path must match Makefile release target and internal/version package
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags "-X arguseek/internal/version.injectedVersion=${VERSION}" \
+    -a -installsuffix cgo -o server cmd/server/main.go
 
 # Final stage - using alpine for operational tooling
 FROM alpine:3.19
