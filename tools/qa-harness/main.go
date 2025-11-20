@@ -1253,7 +1253,7 @@ func startLocalServer() (int, *exec.Cmd, error) {
 	serverPath := filepath.Join(projectRoot, "cmd", "server", "main.go")
 
 	// Start server process
-	cmd := exec.Command("go", "run", serverPath)
+	cmd := exec.Command("go", "run", serverPath, "-http")
 	cmd.Dir = projectRoot // Run from project root so imports resolve
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", port))
 

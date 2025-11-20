@@ -75,12 +75,20 @@ git clone https://github.com/yourusername/arguseek.git
 cd arguseek
 make install
 
-# 2. Set required environment variables
+# 2. Verify installation
+arguseek -version
+# Example outputs:
+#   v1.2.3                    (release build with tag)
+#   a1b2c3d                   (built from git commit)
+#   a1b2c3d-dirty             (built with uncommitted changes)
+#   development               (fallback)
+
+# 3. Set required environment variables
 export GOOGLE_API_KEY="your-google-api-key"
 export GOOGLE_CSE_ID="your-custom-search-engine-id"
 # Optional: export GEMINI_API_KEY="your-gemini-key"  # Defaults to GOOGLE_API_KEY if not set
 
-# 3. Run the server
+# 4. Run the server
 arguseek        # Stdio mode (for local MCP clients)
 # OR
 arguseek -http  # HTTP mode (for remote clients, runs on port 8080)
@@ -190,6 +198,14 @@ Build the server binary without installing it globally:
 make build
 # Creates ./bin/server in the project directory
 # Run with: ./bin/server or ./bin/server -http
+
+# Check version
+./bin/server -version
+# Example outputs:
+#   v1.2.3                    (release build with tag)
+#   a1b2c3d                   (built from git commit)
+#   a1b2c3d-dirty             (built with uncommitted changes)
+#   development               (fallback)
 ```
 
 ### User-local Installation
@@ -201,6 +217,14 @@ make install-user
 # Installs to ~/bin/arguseek
 # Ensure ~/bin is in your PATH: export PATH="$HOME/bin:$PATH"
 # Run from anywhere: arguseek or arguseek -http
+
+# Check installed version
+arguseek -version
+# Example outputs:
+#   v1.2.3                    (release build with tag)
+#   a1b2c3d                   (built from git commit)
+#   a1b2c3d-dirty             (built with uncommitted changes)
+#   development               (fallback)
 ```
 
 ### Platform-Specific Builds
@@ -263,6 +287,44 @@ go test ./...                    # Run tests
 - Get your `GEMINI_API_KEY` (optional): [Gemini API](https://ai.google.dev/)
 
 > **SECURITY:** ArguSeek has no built-in authentication. For local development, use `localhost:8080`. For production, secure with reverse proxy auth, Cloud Run IAM, or API gateway. See [PRODUCTION_SECURITY.md](PRODUCTION_SECURITY.md).
+
+## Deployment
+
+### Deploying to Google Cloud Run
+
+ArguSeek includes an automated deployment system for Google Cloud Run that handles Docker builds, image pushes, traffic routing verification, and post-deployment validation.
+
+**Quick Start**:
+
+```bash
+# 1. Set up configuration files
+cp config/dev.yaml.example config/dev.yaml
+cp config/.env.dev.example config/.env.dev
+# Edit both files with your GCP project details and API keys
+
+# 2. Preview deployment (dry-run mode)
+make deploy-dev-dry
+
+# 3. Review the output, then deploy
+make deploy-dev
+```
+
+**What the automated deployment does**:
+- Builds Docker image for Cloud Run (`linux/amd64`)
+- Pushes to Google Container Registry
+- Deploys with your configured resources (memory, CPU, scaling)
+- Verifies traffic routing (handles Cloud Run's 30-60s routing delay)
+- Runs health checks to validate the deployment
+
+**Available commands**:
+- `make deploy-dev` - Deploy to development environment
+- `make deploy-dev-dry` - Preview development deployment (always use this first!)
+- `make deploy-prod` - Deploy to production environment
+- `make deploy-prod-dry` - Preview production deployment
+
+**Documentation**:
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Comprehensive deployment guide (configuration, troubleshooting, rollback)
+- [PRODUCTION_SECURITY.md](PRODUCTION_SECURITY.md) - Production security and authentication strategies
 
 ## License
 

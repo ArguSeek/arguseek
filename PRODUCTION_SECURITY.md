@@ -4,6 +4,8 @@ ArguSeek is designed to be **open-by-default** for simplicity and ease of local 
 
 **⚠️ For production deployments using HTTP mode, you MUST add security controls externally.**
 
+> **Automated Deployment:** ArguSeek includes an automated deployment system for Google Cloud Run. See [DEPLOYMENT.md](DEPLOYMENT.md) for the recommended deployment workflow with built-in safety checks and traffic verification. This guide covers manual deployment commands and security strategies.
+
 ## Transport Modes and Security
 
 ArguSeek supports two transport modes with different security characteristics:
@@ -94,7 +96,19 @@ arguseek.example.com {
 
 When deploying to Google Cloud Run, enable IAM authentication to restrict access.
 
-**Deploy with IAM:**
+**Automated deployment** (recommended):
+
+ArguSeek includes an automated deployment system. See [DEPLOYMENT.md](DEPLOYMENT.md) for full details.
+
+```bash
+# Configure your deployment in config/prod.yaml and config/.env.prod
+make deploy-prod-dry  # Preview
+make deploy-prod      # Deploy
+```
+
+By default, the automated deployment enables public access (`allUsers`). To enable IAM authentication instead, modify the deployment script or use manual deployment below.
+
+**Manual deployment with IAM:**
 
 ```bash
 gcloud run deploy arguseek-server \
