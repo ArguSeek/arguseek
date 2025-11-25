@@ -1,0 +1,46 @@
+# Update Homebrew Formula
+#
+# Triggers on stable release tags (v*.*.*) to update the Homebrew tap.
+# Pre-release tags (e.g., v1.0.0-beta.1) are intentionally excluded.
+#
+# HOMEBREW_TAP_TOKEN secret requirements:
+# - Personal access token with 'repo' scope
+# - Token owner must have write access to ArguSeek/homebrew-arguseek
+# - Add as repository secret: Settings → Secrets → Actions
+
+name: Update Homebrew Formula
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get tag information
+        id: tag_info
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          SHA=$(git rev-parse $VERSION)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "Dispatching update for $VERSION (commit $SHA)"
+
+      - name: Dispatch to homebrew tap
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          repository: ArguSeek/homebrew-arguseek
+          event-type: update-formula
+          client-payload: |
+            {
+              "version": "${{ steps.tag_info.outputs.version }}",
+              "sha": "${{ steps.tag_info.outputs.sha }}"
+            }
