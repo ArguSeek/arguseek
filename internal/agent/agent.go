@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	
+
 	"arguseek/internal/content"
 )
 
@@ -51,7 +51,7 @@ func NewSearchAgent(config Config) (*SearchAgent, error) {
 
 	searchClient := NewGoogleSearchClient(config.GoogleAPIKey, config.GoogleCSEID)
 	llmClient := NewGeminiClient(config.GeminiAPIKey)
-	
+
 	// Create PDF processing infrastructure
 	pdfClient := NewPDFClient(config.GeminiAPIKey)
 	pdfChunker := content.NewPDFChunker()
@@ -172,7 +172,7 @@ func (a *SearchAgent) ResearchIteratively(ctx context.Context, query string, pre
 
 	// Take up to 30 unique URLs (15 primary + 15 backup for fallback mechanism)
 	maxURLs := min(30, len(urlPairs))
-	
+
 	allURLs := make([]string, maxURLs)
 	for i := 0; i < maxURLs; i++ {
 		allURLs[i] = urlPairs[i].url
@@ -188,14 +188,14 @@ func (a *SearchAgent) ResearchIteratively(ctx context.Context, query string, pre
 	// Content fetching with fallback mechanism
 	primaryCount := min(15, len(allURLs))
 	primaryURLs := allURLs[:primaryCount]
-	var backupURLs []string 
-	
+	var backupURLs []string
+
 	if len(allURLs) > primaryCount {
 		backupURLs = allURLs[primaryCount:]
 	}
-	
-	targetSourceCount := 12  // Target: get at least 12 successful sources
-	
+
+	targetSourceCount := 12 // Target: get at least 12 successful sources
+
 	// Use fallback mechanism: try primary URLs first, then backups if needed
 	fetchedContent, err := a.fetcher.FetchMultipleWithFallback(ctx, primaryURLs, backupURLs, targetSourceCount)
 	if err != nil {
@@ -240,10 +240,10 @@ func (a *SearchAgent) ResearchIteratively(ctx context.Context, query string, pre
 	if biasResult.BiasCategory != "none" && biasResult.CounterQuery != "" {
 		// Find and replace the standard footer with bias warning
 		categoryLabel := map[string]string{
-			"seo_campaign":       "coordinated messaging",
-			"product_promotion":  "promotional content",
+			"seo_campaign":        "coordinated messaging",
+			"product_promotion":   "promotional content",
 			"unanimous_technical": "one-sided coverage",
-			"one_sided":          "missing perspectives",
+			"one_sided":           "missing perspectives",
 		}[biasResult.BiasCategory]
 
 		if categoryLabel == "" {
@@ -364,8 +364,8 @@ Content:
 %s
 
 ---
-📄 **Read more sources:** Use ` + "`" + `fetch_url(url: "[URL]")` + "`" + ` for additional pages
-🔍 **Broader research:** Use ` + "`" + `research_iteratively(query: "[topic]")` + "`" + ` to find more sources`,
+📄 **Read more sources:** Use `+"`"+`fetch_url(url: "[URL]")`+"`"+` for additional pages
+🔍 **Broader research:** Use `+"`"+`research_iteratively(query: "[topic]")`+"`"+` to find more sources`,
 		urlStr,
 		response)
 
@@ -377,23 +377,23 @@ func normalizeURL(rawURL string) string {
 	if rawURL == "" {
 		return ""
 	}
-	
+
 	u, err := url.Parse(rawURL)
 	if err != nil {
 		return rawURL // Return original if parsing fails
 	}
-	
+
 	// Remove fragment
 	u.Fragment = ""
-	
+
 	// Remove trailing slash from path
 	if u.Path != "/" && strings.HasSuffix(u.Path, "/") {
 		u.Path = strings.TrimSuffix(u.Path, "/")
 	}
-	
+
 	// Convert to lowercase hostname
 	u.Host = strings.ToLower(u.Host)
-	
+
 	return u.String()
 }
 
@@ -635,16 +635,16 @@ Begin your response now, ensuring you follow the complete format:`, contextNote,
 	if biasResult.BiasCategory != "none" && biasResult.CounterQuery != "" {
 		// Bias detected - optimized, action-oriented footer
 		categoryLabel := map[string]string{
-			"seo_campaign":       "coordinated messaging",
-			"product_promotion":  "promotional content", 
+			"seo_campaign":        "coordinated messaging",
+			"product_promotion":   "promotional content",
 			"unanimous_technical": "one-sided coverage",
-			"one_sided":          "missing perspectives",
+			"one_sided":           "missing perspectives",
 		}[biasResult.BiasCategory]
-		
+
 		if categoryLabel == "" {
 			categoryLabel = "potential bias"
 		}
-		
+
 		footerInstruction = fmt.Sprintf(`
 
 ---

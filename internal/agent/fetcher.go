@@ -21,7 +21,6 @@ type WebFetcher struct {
 	processor  *content.Processor
 }
 
-
 type FetchConfig struct {
 	MaxRetries     int
 	BackoffBase    time.Duration
@@ -60,7 +59,7 @@ func NewWebFetcherWithPDFSupport(pdfHandler *content.DefaultPDFHandler) *WebFetc
 			},
 			Timeout: config.RequestTimeout,
 		},
-		config:    config,
+		config: config,
 		processor: func() *content.Processor {
 			p := content.NewProcessor()
 			if pdfHandler != nil {
@@ -191,7 +190,7 @@ func (f *WebFetcher) fetchSingleWithRetryAndContext(ctx context.Context, url str
 	}
 
 	var lastErr error
-	
+
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
 			// Exponential backoff with full jitter
@@ -201,7 +200,7 @@ func (f *WebFetcher) fetchSingleWithRetryAndContext(ctx context.Context, url str
 			}
 			// Full jitter: random between 0 and baseDelay
 			jitter := time.Duration(rand.Int63n(int64(baseDelay)))
-			
+
 			// Respect context deadline during backoff
 			select {
 			case <-ctx.Done():
@@ -209,17 +208,17 @@ func (f *WebFetcher) fetchSingleWithRetryAndContext(ctx context.Context, url str
 			case <-time.After(jitter):
 			}
 		}
-		
+
 		content, err := f.fetchSingleAttempt(ctx, url, lookingFor)
 		if err == nil {
 			return content, nil
 		}
-		
+
 		// Don't retry on non-retryable errors or context cancellation
 		if !f.isRetryableError(err) || ctx.Err() != nil {
 			return "", err
 		}
-		
+
 		lastErr = err
 	}
 	return "", lastErr
@@ -251,7 +250,7 @@ func (f *WebFetcher) fetchSingleAttempt(ctx context.Context, url string, looking
 	// Check content type for PDF
 	contentType := resp.Header.Get("Content-Type")
 	log.Printf("🔍 FETCHER DEBUG: URL=%s, Content-Type=%s, Size=%d bytes", url, contentType, len(body))
-	
+
 	if strings.Contains(strings.ToLower(contentType), "application/pdf") {
 		log.Printf("📄 PDF DETECTED: %s (size: %d bytes)", url, len(body))
 		// Process as PDF with looking_for parameter
@@ -278,7 +277,7 @@ func (f *WebFetcher) fetchSingleAttempt(ctx context.Context, url string, looking
 
 	// Process as HTML
 	html := string(body)
-	
+
 	// Use the content processor with unified configuration
 	options := content.ProcessingOptions{
 		MaxLength:          30000,
@@ -287,7 +286,7 @@ func (f *WebFetcher) fetchSingleAttempt(ctx context.Context, url string, looking
 		PreserveTables:     true,
 		LookingFor:         lookingFor,
 	}
-	
+
 	processedContent, err := f.processor.ProcessHTMLWithTimeout(html, options, 5*time.Second)
 	if err != nil {
 		// Content processor includes its own fallback mechanism
@@ -316,5 +315,3 @@ func (f *WebFetcher) isRetryableError(err error) bool {
 		strings.Contains(errStr, "connection") ||
 		strings.Contains(errStr, "temporary failure")
 }
-
-

@@ -64,7 +64,7 @@ func (h *DefaultPDFHandler) buildPDFPrompt(lookingFor string, isChunk bool) stri
 		}
 		return SmallPDFPrompt
 	}
-	
+
 	// Query-focused prompts
 	if isChunk {
 		return fmt.Sprintf(`You are extracting specific information from a PDF chunk.
@@ -78,7 +78,7 @@ Instructions:
 
 Content follows...`, lookingFor, lookingFor, lookingFor)
 	}
-	
+
 	return fmt.Sprintf(`You are extracting specific information from a PDF document.
 LOOKING FOR: %s
 
@@ -98,7 +98,7 @@ func (h *DefaultPDFHandler) processSmallPDF(ctx context.Context, data []byte, op
 
 	// Build query-focused prompt based on options
 	prompt := h.buildPDFPrompt(options.LookingFor, false)
-	
+
 	result, err := h.pdfProcessor.ProcessPDF(ctx, data, prompt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to process small PDF: %w", err)
@@ -167,7 +167,7 @@ func (h *DefaultPDFHandler) processChunksWithTimeout(ctx context.Context, chunks
 
 			// Build query-focused prompt for chunk processing
 			chunkPrompt := h.buildPDFPrompt(options.LookingFor, true)
-			
+
 			result, err := h.pdfProcessor.ProcessPDFWithLimit(chunkCtx, chunkData, chunkPrompt, ChunkSummarizationTokens)
 			if err != nil {
 				if chunkCtx.Err() == context.DeadlineExceeded {

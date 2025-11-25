@@ -13,7 +13,7 @@ const (
 	ChunkProcessTimeout = 10 * time.Second // Per-chunk processing timeout
 
 	// Token limits for PDF processing
-	DefaultMaxTokens      = 30000 // Default token limit for large PDFs
+	DefaultMaxTokens         = 30000 // Default token limit for large PDFs
 	ChunkSummarizationTokens = 1000  // Token limit for chunk summarization
 
 	// PDF size thresholds
@@ -21,9 +21,9 @@ const (
 
 	// Chunk size configuration
 	PagesPerChunk = 3 // Number of pages per chunk for big PDF processing
-	
+
 	// PDF Client Constants (duplicated from agent package for consistency)
-	PDFClientDefaultMaxTokens = 30000  // Default token limit for large PDFs
+	PDFClientDefaultMaxTokens   = 30000  // Default token limit for large PDFs
 	PDFClientLargeSizeThreshold = 500000 // 500KB threshold for large PDF detection
 )
 

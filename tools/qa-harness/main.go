@@ -68,9 +68,9 @@ const (
 	REQUEST_TIMEOUT    = 90 * time.Second
 
 	// Local server configuration
-	SERVER_STARTUP_TIMEOUT = 30 * time.Second
+	SERVER_STARTUP_TIMEOUT  = 30 * time.Second
 	SERVER_SHUTDOWN_TIMEOUT = 10 * time.Second
-	HEALTH_CHECK_INTERVAL = 500 * time.Millisecond
+	HEALTH_CHECK_INTERVAL   = 500 * time.Millisecond
 )
 
 // Environment represents a test environment configuration

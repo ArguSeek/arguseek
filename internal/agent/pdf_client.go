@@ -9,7 +9,7 @@ import (
 	"io"
 	"net/http"
 	"time"
-	
+
 	"arguseek/internal/content"
 )
 
@@ -20,8 +20,8 @@ type geminiInlineData struct {
 }
 
 type pdfGeminiPart struct {
-	Text       *string            `json:"text,omitempty"`
-	InlineData *geminiInlineData  `json:"inline_data,omitempty"`
+	Text       *string           `json:"text,omitempty"`
+	InlineData *geminiInlineData `json:"inline_data,omitempty"`
 }
 
 type pdfGeminiContent struct {
@@ -191,4 +191,3 @@ func (c *PDFClient) sendRequest(ctx context.Context, url string, req pdfGeminiRe
 
 	return *geminiResp.Candidates[0].Content.Parts[0].Text, nil
 }
-

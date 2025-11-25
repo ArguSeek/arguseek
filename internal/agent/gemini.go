@@ -25,8 +25,8 @@ type GeminiClient struct {
 }
 
 type geminiRequest struct {
-	Contents         []geminiContent    `json:"contents"`
-	GenerationConfig *generationConfig  `json:"generationConfig,omitempty"`
+	Contents         []geminiContent   `json:"contents"`
+	GenerationConfig *generationConfig `json:"generationConfig,omitempty"`
 }
 
 type generationConfig struct {
@@ -39,9 +39,8 @@ type geminiContent struct {
 }
 
 type geminiPart struct {
-	Text       *string            `json:"text,omitempty"`
+	Text *string `json:"text,omitempty"`
 }
-
 
 type geminiResponse struct {
 	Candidates []geminiCandidate `json:"candidates"`
@@ -145,5 +144,3 @@ func (c *GeminiClient) CompleteWithTemp(ctx context.Context, prompt string, mode
 
 	return *geminiResp.Candidates[0].Content.Parts[0].Text, nil
 }
-
-

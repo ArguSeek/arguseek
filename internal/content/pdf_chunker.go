@@ -31,7 +31,7 @@ func (c *DefaultPDFChunker) GetPageCount(data []byte) (pageCount int, err error)
 	if len(data) < 4 {
 		return 0, fmt.Errorf("invalid PDF: data too short")
 	}
-	
+
 	// Check for PDF header
 	if !bytes.HasPrefix(data, []byte("%PDF")) {
 		return 0, fmt.Errorf("invalid PDF: missing PDF header")
@@ -46,7 +46,7 @@ func (c *DefaultPDFChunker) GetPageCount(data []byte) (pageCount int, err error)
 	if ctx == nil {
 		return 0, fmt.Errorf("failed to process PDF: document appears to be corrupted")
 	}
-	
+
 	return ctx.PageCount, nil
 }
 

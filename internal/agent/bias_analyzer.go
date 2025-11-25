@@ -25,7 +25,7 @@ func (b *BiasAnalyzer) AnalyzeBias(ctx context.Context, fetchedContent map[strin
 	}
 
 	prompt := b.buildBiasAnalysisPrompt(fetchedContent)
-	
+
 	// Use temperature 0.2 for consistent yet slightly varied analysis
 	temp := 0.2
 	response, err := b.llmClient.CompleteWithTemp(ctx, prompt, GeminiFlash25, &temp)
@@ -138,11 +138,11 @@ func (b *BiasAnalyzer) parseResponse(response string) BiasAnalysisResult {
 
 	// Validate category
 	validCategories := map[string]bool{
-		"none":               true,
-		"seo_campaign":       true,
-		"product_promotion":  true,
+		"none":                true,
+		"seo_campaign":        true,
+		"product_promotion":   true,
 		"unanimous_technical": true,
-		"one_sided":          true,
+		"one_sided":           true,
 	}
 
 	category := strings.ToLower(strings.TrimSpace(jsonResponse.Category))

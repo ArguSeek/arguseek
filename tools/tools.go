@@ -7,6 +7,6 @@ package tools
 // Build constraint ensures it's excluded from production builds
 
 import (
-	// Development tool dependencies go here
-	// Example: _ "github.com/golang/mock/mockgen"
+// Development tool dependencies go here
+// Example: _ "github.com/golang/mock/mockgen"
 )
