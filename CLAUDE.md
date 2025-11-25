@@ -14,7 +14,12 @@ Operational guidance for AI agents. For user docs, see [README.md](README.md).
 ## Quick Commands
 
 ```bash
-# Build & Install
+# Install via Homebrew (Recommended for macOS/Linux)
+brew tap ArguSeek/arguseek
+brew install arguseek
+arguseek -version
+
+# Build & Install from Source
 make build              # → ./bin/server
 make install            # Global (sudo) → /usr/local/bin/arguseek
 make install-user       # User → ~/bin/arguseek
