@@ -67,6 +67,20 @@ fetch_url(url="https://github.com/vercel/next.js/releases/tag/v15.0.0", looking_
 
 > See [Configuration](#configuration) section below for detailed API key setup links.
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap ArguSeek/arguseek
+brew install arguseek
+arguseek -version
+```
+
+Builds from source (no Gatekeeper warnings). Works on Intel and Apple Silicon. Update with `brew upgrade arguseek`.
+
+See [Quick Start](#quick-start) below for environment variables and running the server.
+
+> **Tap repository:** [ArguSeek/homebrew-arguseek](https://github.com/ArguSeek/homebrew-arguseek)
+
 ### Quick Start
 
 ```bash
