@@ -517,5 +517,7 @@ func writeError(w http.ResponseWriter, id any, code int, message string, httpSta
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(httpStatus)
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("failed to encode error response: %v", err)
+	}
 }
