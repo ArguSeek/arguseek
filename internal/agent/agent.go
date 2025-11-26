@@ -34,7 +34,7 @@ type SearchResult struct {
 
 func NewSearchAgent(config Config) (*SearchAgent, error) {
 	if config.GeminiAPIKey == "" {
-		return nil, fmt.Errorf("Gemini API key is required")
+		return nil, fmt.Errorf("gemini API key is required")
 	}
 
 	// Google API credentials are optional for testing
