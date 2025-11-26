@@ -397,40 +397,6 @@ func normalizeURL(rawURL string) string {
 	return u.String()
 }
 
-func (a *SearchAgent) generateAdditionalQueries(ctx context.Context, currentQuery string, previousQuery *string) ([]string, error) {
-	var prompt string
-	if previousQuery != nil && *previousQuery != "" {
-		prompt = fmt.Sprintf(`Based on this query progression, suggest 2 additional search queries:
-
-Previous: "%s"
-Current: "%s"
-
-Return only the queries, one per line, no numbering or explanation.`, *previousQuery, currentQuery)
-	} else {
-		prompt = fmt.Sprintf(`Based on this query, suggest 2 additional related search queries to get comprehensive information:
-
-Current: "%s"
-
-Return only the queries, one per line, no numbering or explanation.`, currentQuery)
-	}
-
-	response, err := a.llmClient.Complete(ctx, prompt, GeminiFlash25)
-	if err != nil {
-		return nil, err
-	}
-
-	lines := strings.Split(response, "\n")
-	var queries []string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" && !strings.HasPrefix(line, "-") && !strings.HasPrefix(line, "*") {
-			queries = append(queries, line)
-		}
-	}
-
-	return queries, nil
-}
-
 // detectQueryIntent analyzes the query to determine its type
 func (a *SearchAgent) detectQueryIntent(query string) string {
 	lowerQuery := strings.ToLower(query)

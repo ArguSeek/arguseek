@@ -171,16 +171,8 @@ func (f *WebFetcher) FetchMultipleWithContext(ctx context.Context, primaryURLs [
 	return results, nil
 }
 
-func (f *WebFetcher) fetchSingle(ctx context.Context, url string) (string, error) {
-	return f.fetchSingleWithRetry(ctx, url, f.config.MaxRetries)
-}
-
 func (f *WebFetcher) fetchSingleWithContext(ctx context.Context, url string, lookingFor string) (string, error) {
 	return f.fetchSingleWithRetryAndContext(ctx, url, f.config.MaxRetries, lookingFor)
-}
-
-func (f *WebFetcher) fetchSingleWithRetry(ctx context.Context, url string, maxRetries int) (string, error) {
-	return f.fetchSingleWithRetryAndContext(ctx, url, maxRetries, "")
 }
 
 func (f *WebFetcher) fetchSingleWithRetryAndContext(ctx context.Context, url string, maxRetries int, lookingFor string) (string, error) {
