@@ -2,6 +2,7 @@
   <img src="assets/logos/logo-full.svg" alt="ArguSeek" width="350">
 
   <p>
+    <a href="https://github.com/ArguSeek/arguseek/actions/workflows/ci.yml"><img src="https://github.com/ArguSeek/arguseek/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
     <img src="https://img.shields.io/badge/100%25%20AI-Generated-ff69b4.svg" alt="100% AI Generated">
   </p>
