@@ -345,20 +345,6 @@ make deploy-dev
 
 ArguSeek is released under the [MIT License](LICENSE).
 
-## Branding
-
-Logo assets are available in [`assets/logos/`](assets/logos/):
-- `logo-full.svg` - Primary wordmark with icon (350×64)
-- `logo-symbol.svg` - Icon only for favicons and small spaces (100×100)
-- `wordmark.svg` - Text only for horizontal layouts (240×50)
-- `favicon-*.svg` - Optimized favicons in multiple sizes
-
-**Color Palette:**
-- Primary: `#10B981` (Emerald Green) - knowledge, growth, open source
-- Accent: `#14B8A6` (Teal) - innovation, discovery, analysis
-
-For detailed usage guidelines and design specs, see [`assets/logos/showcase.jsx`](assets/logos/showcase.jsx).
-
 ---
 
 **Run locally or self-host your grounding infrastructure. Transform agents from guessing to knowing.**
