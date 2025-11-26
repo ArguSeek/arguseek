@@ -268,7 +268,7 @@ func TestProcessHTMLWithTimeout(t *testing.T) {
 	}
 
 	// Test with very short timeout (might not always trigger timeout, but tests the path)
-	_, err = p.ProcessHTMLWithTimeout(html, options, 1*time.Nanosecond)
+	_, _ = p.ProcessHTMLWithTimeout(html, options, 1*time.Nanosecond)
 	// We don't assert error here as it's timing-dependent
 }
 
