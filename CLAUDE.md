@@ -32,6 +32,7 @@ DEBUG=true ./bin/server -http
 # Test
 go run tools/qa-harness/main.go local
 go test -v ./...
+make lint              # Ensure clean linter output
 
 # Deploy (ALWAYS dry-run first)
 make deploy-dev-dry && make deploy-dev
@@ -109,6 +110,7 @@ case <-ctx.Done(): return ctx.Err()
 4. **API Key Management** - Load from env vars or secrets manager, NEVER hardcode
 5. **JSON-RPC Compliance** - Clients rely on error codes for retry logic
 6. **Context Cancellation** - All blocking operations must respect `ctx.Done()`
+7. **Clean Lint** - All code must pass `make lint` with no errors or warnings
 
 ---
 
