@@ -235,7 +235,9 @@ func (h *Handler) HandleRequest(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		log.Printf("Failed to encode response: %v", err)
+	}
 }
 
 func (h *Handler) processInitialize(req Request) (Response, error) {
@@ -502,13 +504,6 @@ func validateURL(urlStr string) error {
 	}
 
 	return nil
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func writeError(w http.ResponseWriter, id any, code int, message string, httpStatus int) {

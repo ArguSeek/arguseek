@@ -77,7 +77,9 @@ func main() {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(debug)
+		if err := json.NewEncoder(w).Encode(debug); err != nil {
+			log.Printf("Failed to encode response: %v", err)
+		}
 	})
 
 	http.HandleFunc("/test-search", func(w http.ResponseWriter, r *http.Request) {
@@ -102,7 +104,9 @@ func main() {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			log.Printf("Failed to encode response: %v", err)
+		}
 	})
 
 	log.Printf("Starting debug server on port %s", port)
