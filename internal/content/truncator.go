@@ -172,10 +172,6 @@ func (t *SmartTruncator) splitIntoSentences(text string) []string {
 			if i+1 >= len(runes) || unicode.IsSpace(runes[i+1]) {
 				sentences = append(sentences, strings.TrimSpace(current.String()))
 				current.Reset()
-				// Skip the space after sentence
-				if i+1 < len(runes) && unicode.IsSpace(runes[i+1]) {
-					i++
-				}
 			}
 		}
 	}

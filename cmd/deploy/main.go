@@ -489,14 +489,12 @@ func verifyTrafficRouting(config *Config) error {
 		// If this is the last attempt, provide detailed error
 		if attempt == maxAttempts {
 			var actualPercent float64
-			if statusTraffic != nil {
-				for _, t := range statusTraffic {
-					trafficItem := t.(map[string]interface{})
-					if revisionName, hasRevision := trafficItem["revisionName"].(string); hasRevision {
-						if revisionName == latestRevision {
-							if percent, hasPercent := trafficItem["percent"].(float64); hasPercent {
-								actualPercent = percent
-							}
+			for _, t := range statusTraffic {
+				trafficItem := t.(map[string]interface{})
+				if revisionName, hasRevision := trafficItem["revisionName"].(string); hasRevision {
+					if revisionName == latestRevision {
+						if percent, hasPercent := trafficItem["percent"].(float64); hasPercent {
+							actualPercent = percent
 						}
 					}
 				}

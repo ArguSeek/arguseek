@@ -113,12 +113,8 @@ Output ONLY valid JSON in this exact format:
 func (b *BiasAnalyzer) parseResponse(response string) BiasAnalysisResult {
 	// Clean the response - remove any markdown formatting
 	response = strings.TrimSpace(response)
-	if strings.HasPrefix(response, "```json") {
-		response = strings.TrimPrefix(response, "```json")
-	}
-	if strings.HasSuffix(response, "```") {
-		response = strings.TrimSuffix(response, "```")
-	}
+	response = strings.TrimPrefix(response, "```json")
+	response = strings.TrimSuffix(response, "```")
 	response = strings.TrimSpace(response)
 
 	// Parse JSON response
