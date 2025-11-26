@@ -50,6 +50,9 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 const (
@@ -1092,7 +1095,7 @@ func calculatePerformanceMetrics(durations []time.Duration) PerformanceMetrics {
 
 func displayReport(report TestReport) {
 	fmt.Println("\n" + strings.Repeat("=", 60))
-	fmt.Printf("ArguSeek QA Test Report - %s Environment\n", strings.Title(report.Environment))
+	fmt.Printf("ArguSeek QA Test Report - %s Environment\n", cases.Title(language.English).String(report.Environment))
 	fmt.Println(strings.Repeat("=", 60))
 
 	fmt.Printf("Test Suite Version: %s\n", report.Version)
@@ -1427,7 +1430,10 @@ func runContentProcessorValidation() {
 
 		respBody, _ := io.ReadAll(resp.Body)
 		var mpcResp MCPResponse
-		json.Unmarshal(respBody, &mpcResp)
+		if err := json.Unmarshal(respBody, &mpcResp); err != nil {
+			log.Printf("   ❌ Failed to parse MCP response: %v", err)
+			continue
+		}
 
 		if mpcResp.Error != nil {
 			log.Printf("   ❌ MCP Error: %s", mpcResp.Error.Message)
