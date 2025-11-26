@@ -84,7 +84,7 @@ func (c *GeminiClient) Complete(ctx context.Context, prompt string, model Gemini
 
 func (c *GeminiClient) CompleteWithTemp(ctx context.Context, prompt string, model GeminiModel, temperature *float64) (string, error) {
 	if c.apiKey == "" {
-		return "", fmt.Errorf("Gemini API key is empty")
+		return "", fmt.Errorf("gemini API key is empty")
 	}
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, c.apiKey)
 
@@ -122,15 +122,15 @@ func (c *GeminiClient) CompleteWithTemp(ctx context.Context, prompt string, mode
 	if err != nil {
 		return "", fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		// Log the actual error for debugging
 		if resp.StatusCode == 429 {
-			return "", fmt.Errorf("Gemini API returned status %d: %s (key prefix: %s...)", resp.StatusCode, string(body), c.apiKey[:10])
+			return "", fmt.Errorf("gemini API returned status %d: %s (key prefix: %s...)", resp.StatusCode, string(body), c.apiKey[:10])
 		}
-		return "", fmt.Errorf("Gemini API returned status %d: %s", resp.StatusCode, string(body))
+		return "", fmt.Errorf("gemini API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var geminiResp geminiResponse

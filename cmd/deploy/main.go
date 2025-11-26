@@ -211,7 +211,9 @@ func loadEnvVars(env string) error {
 		if len(parts) == 2 {
 			key := strings.TrimSpace(parts[0])
 			value := strings.TrimSpace(parts[1])
-			os.Setenv(key, value)
+			if err := os.Setenv(key, value); err != nil {
+				return fmt.Errorf("failed to set env %s: %w", key, err)
+			}
 		}
 	}
 
@@ -622,7 +624,7 @@ func runValidation(env string) error {
 	if err != nil {
 		return fmt.Errorf("health check request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("health check failed. HTTP status: %d", resp.StatusCode)
@@ -650,7 +652,7 @@ func runValidation(env string) error {
 	if err != nil {
 		return fmt.Errorf("MCP endpoint test request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("MCP endpoint test failed. HTTP status: %d", resp.StatusCode)

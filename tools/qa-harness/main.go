@@ -357,7 +357,7 @@ func validateEnvironment(env Environment) bool {
 		log.Printf("ERROR: Failed to reach health endpoint: %v", err)
 		return false
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("ERROR: Health check returned status %d", resp.StatusCode)
@@ -713,7 +713,7 @@ func runSequentialTests(env Environment, testCases []TestCase) []TestResult {
 		log.Printf("  Duration: %v", result.Duration)
 
 		// Print failed test details for debugging (but not for negative tests that pass validation)
-		if !testPassed && !(tc.ExpectError && len(validationErrors) == 0) {
+		if !testPassed && (!tc.ExpectError || len(validationErrors) != 0) {
 			log.Println("  === Failed Test Details ===")
 			if result.Error != nil {
 				log.Printf("  Error: %v", result.Error)
@@ -861,7 +861,7 @@ func executeTest(env Environment, tc TestCase) TestResult {
 				// Note: We still set Error, but analyzeResults will treat this as success for ExpectError tests
 			} else {
 				// FAILURE: Got an error, but wrong error code
-				result.Error = fmt.Errorf("Expected MCP error %d, got error %d: %s", tc.ExpectedErrorCode, resp.Error.Code, resp.Error.Message)
+				result.Error = fmt.Errorf("expected MCP error %d, got error %d: %s", tc.ExpectedErrorCode, resp.Error.Code, resp.Error.Message)
 			}
 		} else {
 			// This test doesn't expect an error - this is a failure
@@ -871,7 +871,7 @@ func executeTest(env Environment, tc TestCase) TestResult {
 		// MCP returned a success response
 		if tc.ExpectError {
 			// This test expected an error but got success - this is a failure
-			result.Error = fmt.Errorf("Expected error (code %d) but got successful response", tc.ExpectedErrorCode)
+			result.Error = fmt.Errorf("expected error (code %d) but got successful response", tc.ExpectedErrorCode)
 		} else {
 			// Normal success case - parse the MCP-compliant response
 			var toolResult MCPToolResult
@@ -910,7 +910,7 @@ func callMCP(env Environment, path string, req MCPRequest) (*MCPResponse, error)
 	if err != nil {
 		return nil, fmt.Errorf("request failed: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -1225,7 +1225,7 @@ func findAvailablePort() (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to find available port: %v", err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 
 	addr := listener.Addr().(*net.TCPAddr)
 	return addr.Port, nil
@@ -1281,12 +1281,12 @@ func waitForServerReady(port int) error {
 	for time.Now().Before(deadline) {
 		resp, err := http.Get(healthURL)
 		if err == nil && resp.StatusCode == http.StatusOK {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			log.Println("✓ Server is ready")
 			return nil
 		}
 		if resp != nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		time.Sleep(HEALTH_CHECK_INTERVAL)
 	}
@@ -1426,7 +1426,7 @@ func runContentProcessorValidation() {
 			log.Printf("   ❌ Request failed: %v", err)
 			continue
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		respBody, _ := io.ReadAll(resp.Body)
 		var mpcResp MCPResponse

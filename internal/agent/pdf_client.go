@@ -55,7 +55,7 @@ func NewPDFClient(apiKey string) *PDFClient {
 // ProcessPDF processes a PDF document with the given prompt
 func (c *PDFClient) ProcessPDF(ctx context.Context, pdfData []byte, prompt string) (string, error) {
 	if c.apiKey == "" {
-		return "", fmt.Errorf("Gemini API key is empty")
+		return "", fmt.Errorf("gemini API key is empty")
 	}
 
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
@@ -111,7 +111,7 @@ func (c *PDFClient) ProcessPDF(ctx context.Context, pdfData []byte, prompt strin
 // ProcessPDFWithLimit processes a PDF with a specific token limit
 func (c *PDFClient) ProcessPDFWithLimit(ctx context.Context, pdfData []byte, prompt string, maxTokens int) (string, error) {
 	if c.apiKey == "" {
-		return "", fmt.Errorf("Gemini API key is empty")
+		return "", fmt.Errorf("gemini API key is empty")
 	}
 
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
@@ -170,14 +170,14 @@ func (c *PDFClient) sendRequest(ctx context.Context, url string, req pdfGeminiRe
 	if err != nil {
 		return "", fmt.Errorf("request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
 		if resp.StatusCode == 429 {
-			return "", fmt.Errorf("Gemini API returned status %d: %s (key prefix: %s...)", resp.StatusCode, string(respBody), c.apiKey[:10])
+			return "", fmt.Errorf("gemini API returned status %d: %s (key prefix: %s...)", resp.StatusCode, string(respBody), c.apiKey[:10])
 		}
-		return "", fmt.Errorf("Gemini API returned status %d: %s", resp.StatusCode, string(respBody))
+		return "", fmt.Errorf("gemini API returned status %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	var geminiResp geminiResponse

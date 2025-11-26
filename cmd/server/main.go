@@ -120,7 +120,7 @@ func main() {
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"healthy","service":"arguseek"}`)
+		_, _ = fmt.Fprintf(w, `{"status":"healthy","service":"arguseek"}`)
 	})
 
 	// OAuth discovery endpoint - signals no authentication required
@@ -144,7 +144,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		// Minimal OAuth metadata - issuer field signals no OAuth flow required
 		// Use configured issuer URL (from OAUTH_ISSUER env var) for stable identity
-		fmt.Fprintf(w, `{"issuer":%q}`, oauthIssuer)
+		_, _ = fmt.Fprintf(w, `{"issuer":%q}`, oauthIssuer)
 	})
 
 	// Setup MCP endpoint without authentication
@@ -159,13 +159,13 @@ func main() {
 		// Root path returns service info for discovery
 		if r.URL.Path == "/" {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{"service":"arguseek","version":"%s","endpoints":["/health","/.well-known/oauth-authorization-server","/mcp"]}`, version.Version)
+			_, _ = fmt.Fprintf(w, `{"service":"arguseek","version":"%s","endpoints":["/health","/.well-known/oauth-authorization-server","/mcp"]}`, version.Version)
 			return
 		}
 
 		// All other unregistered paths return JSON 404
 		w.WriteHeader(http.StatusNotFound)
-		fmt.Fprintf(w, `{"error":"not found","path":%q}`, r.URL.Path)
+		_, _ = fmt.Fprintf(w, `{"error":"not found","path":%q}`, r.URL.Path)
 	})
 
 	server := &http.Server{

@@ -39,7 +39,7 @@ func (h *Handler) ServeStdio(ctx context.Context) error {
 
 	scanner := bufio.NewScanner(os.Stdin)
 	writer := bufio.NewWriter(os.Stdout)
-	defer writer.Flush()
+	defer func() { _ = writer.Flush() }()
 
 	// Read requests line by line until EOF or shutdown
 	for scanner.Scan() {

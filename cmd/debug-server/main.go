@@ -55,7 +55,7 @@ func main() {
 	// Set up HTTP endpoints
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"healthy","service":"arguseek-debug"}`)
+		_, _ = fmt.Fprintf(w, `{"status":"healthy","service":"arguseek-debug"}`)
 	})
 
 	http.HandleFunc("/debug", func(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +85,7 @@ func main() {
 	http.HandleFunc("/test-search", func(w http.ResponseWriter, r *http.Request) {
 		if searchAgent == nil {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, `{"error":"Search agent not initialized"}`)
+			_, _ = fmt.Fprintf(w, `{"error":"Search agent not initialized"}`)
 			return
 		}
 
