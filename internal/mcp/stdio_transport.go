@@ -37,9 +37,15 @@ func (h *Handler) ServeStdio(ctx context.Context) error {
 		cancel()
 	}()
 
-	scanner := bufio.NewScanner(os.Stdin)
-	writer := bufio.NewWriter(os.Stdout)
-	defer func() { _ = writer.Flush() }()
+	return h.serveStdioWithIO(ctx, os.Stdin, os.Stdout)
+}
+
+// serveStdioWithIO is the testable implementation that accepts injectable I/O streams.
+// This allows tests to use in-memory readers/writers instead of os.Stdin/os.Stdout.
+func (h *Handler) serveStdioWithIO(ctx context.Context, reader io.Reader, writer io.Writer) error {
+	scanner := bufio.NewScanner(reader)
+	bufferedWriter := bufio.NewWriter(writer)
+	defer func() { _ = bufferedWriter.Flush() }()
 
 	// Read requests line by line until EOF or shutdown
 	for scanner.Scan() {
@@ -68,7 +74,7 @@ func (h *Handler) ServeStdio(ctx context.Context) error {
 					Message: fmt.Sprintf("Parse error: %v", err),
 				},
 			}
-			if err := writeStdioResponse(writer, errorResp); err != nil {
+			if err := writeStdioResponse(bufferedWriter, errorResp); err != nil {
 				log.Printf("Failed to write error response: %v", err)
 			}
 			continue
@@ -78,7 +84,7 @@ func (h *Handler) ServeStdio(ctx context.Context) error {
 		response, err := h.ProcessRequest(ctx, req)
 		if err != nil {
 			log.Printf("Internal error processing request: %v", err)
-			response = Response{
+			errorResp := Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
 				Error: &Error{
@@ -86,10 +92,19 @@ func (h *Handler) ServeStdio(ctx context.Context) error {
 					Message: fmt.Sprintf("Internal error: %v", err),
 				},
 			}
+			if err := writeStdioResponse(bufferedWriter, errorResp); err != nil {
+				log.Printf("Failed to write error response: %v", err)
+			}
+			continue
+		}
+
+		// Notifications return nil - no response per JSON-RPC 2.0 spec
+		if response == nil {
+			continue
 		}
 
 		// Write response to stdout
-		if err := writeStdioResponse(writer, response); err != nil {
+		if err := writeStdioResponse(bufferedWriter, *response); err != nil {
 			log.Printf("Failed to write response: %v", err)
 			return err
 		}

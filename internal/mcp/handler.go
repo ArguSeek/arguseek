@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"arguseek/internal/agent"
 	"arguseek/internal/request"
@@ -140,12 +141,20 @@ func wrapInContent(result interface{}) ToolCallResult {
 	}
 }
 
+// isNotification returns true if the method is an MCP notification.
+// Per JSON-RPC 2.0 spec: notifications MUST NOT receive responses.
+// MCP notifications use the "notifications/" prefix by convention.
+func isNotification(method string) bool {
+	return strings.HasPrefix(method, "notifications/")
+}
+
 // ProcessRequest handles the core MCP protocol logic independent of transport.
-// Returns a Response struct and error for transport-agnostic handling.
-func (h *Handler) ProcessRequest(ctx context.Context, req Request) (Response, error) {
+// Returns a *Response (nil for notifications) and error for transport-agnostic handling.
+// A nil response indicates the request was a notification and no response should be sent.
+func (h *Handler) ProcessRequest(ctx context.Context, req Request) (*Response, error) {
 	// Validate protocol version
 	if req.JSONRPC != "2.0" {
-		return Response{
+		return &Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Error: &Error{
@@ -155,22 +164,20 @@ func (h *Handler) ProcessRequest(ctx context.Context, req Request) (Response, er
 		}, nil
 	}
 
+	// Handle notifications - no response per JSON-RPC 2.0 spec
+	if isNotification(req.Method) {
+		return nil, nil
+	}
+
 	switch req.Method {
 	case "initialize":
 		return h.processInitialize(req)
-	case "notifications/initialized":
-		// MCP protocol notification - client confirms initialization complete
-		// Per MCP spec: return success with no result for client notifications
-		return Response{
-			JSONRPC: "2.0",
-			ID:      req.ID,
-		}, nil
 	case "tools/list":
 		return h.processToolsList(req)
 	case "tools/call":
 		return h.processToolsCall(ctx, req)
 	default:
-		return Response{
+		return &Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Error: &Error{
@@ -208,8 +215,8 @@ func (h *Handler) HandleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For notifications/initialized, return 202 Accepted with no body
-	if req.Method == "notifications/initialized" {
+	// Notifications return nil - no response per JSON-RPC 2.0 spec
+	if response == nil {
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
@@ -240,7 +247,7 @@ func (h *Handler) HandleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) processInitialize(req Request) (Response, error) {
+func (h *Handler) processInitialize(req Request) (*Response, error) {
 	result := InitializeResult{
 		ProtocolVersion: "2024-11-05",
 		Capabilities: Capabilities{
@@ -254,14 +261,14 @@ func (h *Handler) processInitialize(req Request) (Response, error) {
 		},
 	}
 
-	return Response{
+	return &Response{
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result:  result,
 	}, nil
 }
 
-func (h *Handler) processToolsList(req Request) (Response, error) {
+func (h *Handler) processToolsList(req Request) (*Response, error) {
 	tools := []Tool{
 		{
 			Name:        "research_iteratively",
@@ -305,18 +312,18 @@ func (h *Handler) processToolsList(req Request) (Response, error) {
 		Tools: tools,
 	}
 
-	return Response{
+	return &Response{
 		JSONRPC: "2.0",
 		ID:      req.ID,
 		Result:  result,
 	}, nil
 }
 
-func (h *Handler) processToolsCall(ctx context.Context, req Request) (Response, error) {
+func (h *Handler) processToolsCall(ctx context.Context, req Request) (*Response, error) {
 	// Parse the params as a tools/call request
 	paramsJSON, err := json.Marshal(req.Params)
 	if err != nil {
-		return Response{
+		return &Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Error: &Error{
@@ -328,7 +335,7 @@ func (h *Handler) processToolsCall(ctx context.Context, req Request) (Response, 
 
 	var params Params
 	if err := json.Unmarshal(paramsJSON, &params); err != nil {
-		return Response{
+		return &Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Error: &Error{
@@ -342,7 +349,7 @@ func (h *Handler) processToolsCall(ctx context.Context, req Request) (Response, 
 	case "research_iteratively":
 		// Validate query length (prevents ReDoS and resource exhaustion)
 		if err := validateQueryLength(params.Arguments.Query); err != nil {
-			return Response{
+			return &Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
 				Error: &Error{
@@ -353,7 +360,7 @@ func (h *Handler) processToolsCall(ctx context.Context, req Request) (Response, 
 		}
 		if params.Arguments.PreviousQuery != nil && *params.Arguments.PreviousQuery != "" {
 			if err := validateQueryLength(*params.Arguments.PreviousQuery); err != nil {
-				return Response{
+				return &Response{
 					JSONRPC: "2.0",
 					ID:      req.ID,
 					Error: &Error{
@@ -366,7 +373,7 @@ func (h *Handler) processToolsCall(ctx context.Context, req Request) (Response, 
 
 		result, err := h.agent.ResearchIteratively(ctx, params.Arguments.Query, params.Arguments.PreviousQuery)
 		if err != nil {
-			return Response{
+			return &Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
 				Error: &Error{
@@ -376,7 +383,7 @@ func (h *Handler) processToolsCall(ctx context.Context, req Request) (Response, 
 			}, nil
 		}
 
-		return Response{
+		return &Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Result:  wrapInContent(result),
@@ -385,7 +392,7 @@ func (h *Handler) processToolsCall(ctx context.Context, req Request) (Response, 
 	case "fetch_url":
 		// Validate URL (prevents SSRF attacks)
 		if err := validateURL(params.Arguments.URL); err != nil {
-			return Response{
+			return &Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
 				Error: &Error{
@@ -397,7 +404,7 @@ func (h *Handler) processToolsCall(ctx context.Context, req Request) (Response, 
 
 		result, err := h.agent.FetchURL(ctx, params.Arguments.URL, params.Arguments.LookingFor)
 		if err != nil {
-			return Response{
+			return &Response{
 				JSONRPC: "2.0",
 				ID:      req.ID,
 				Error: &Error{
@@ -407,14 +414,14 @@ func (h *Handler) processToolsCall(ctx context.Context, req Request) (Response, 
 			}, nil
 		}
 
-		return Response{
+		return &Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Result:  wrapInContent(result),
 		}, nil
 
 	default:
-		return Response{
+		return &Response{
 			JSONRPC: "2.0",
 			ID:      req.ID,
 			Error: &Error{
