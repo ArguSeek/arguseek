@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -102,8 +103,8 @@ func (c *PDFClient) ProcessPDF(ctx context.Context, pdfData []byte, prompt strin
 	if isLargePDF {
 		strategy = "summarization"
 	}
-	fmt.Printf("PDF size: %dKB, using %s strategy\n", pdfSizeKB, strategy)
-	fmt.Printf("Using maxOutputTokens: %d\n", maxTokens)
+	log.Printf("PDF size: %dKB, using %s strategy\n", pdfSizeKB, strategy)
+	log.Printf("Using maxOutputTokens: %d\n", maxTokens)
 
 	return c.sendRequest(ctx, url, req)
 }
@@ -146,8 +147,8 @@ func (c *PDFClient) ProcessPDFWithLimit(ctx context.Context, pdfData []byte, pro
 	}
 
 	// Debug logging for limited response
-	fmt.Printf("Limited response length: %d characters (max %d tokens)\n", len(result), maxTokens)
-	fmt.Printf("Estimated output tokens: ~%d\n", len(result)/4)
+	log.Printf("Limited response length: %d characters (max %d tokens)\n", len(result), maxTokens)
+	log.Printf("Estimated output tokens: ~%d\n", len(result)/4)
 
 	return result, nil
 }

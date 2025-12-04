@@ -51,10 +51,10 @@ func main() {
 	}
 	logging.SetLevel(logLevel)
 
-	// In stdio mode, redirect logs to stderr (stdout reserved for MCP messages)
-	if !*httpMode {
-		log.SetOutput(os.Stderr)
-	}
+	// Configure log output: always use stderr
+	// - Stdio mode: stdout reserved for MCP messages
+	// - HTTP mode: explicit stderr for structured logging
+	log.SetOutput(os.Stderr)
 
 	port := os.Getenv("PORT")
 	if port == "" {

@@ -3,7 +3,6 @@ package logging
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -81,7 +80,7 @@ func (l *Logger) log(ctx context.Context, level Level, msg string, fields map[st
 		return
 	}
 
-	fmt.Println(string(jsonEntry))
+	log.Println(string(jsonEntry))
 
 	// For fatal logs, exit the program
 	if level == FATAL {
