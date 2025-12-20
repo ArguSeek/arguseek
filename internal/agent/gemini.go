@@ -1,14 +1,11 @@
 package agent
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"strings"
-	"time"
+	"os"
+
+	"google.golang.org/genai"
 )
 
 // Model enum for type safety
@@ -19,128 +16,105 @@ const (
 	GeminiFlash25Lite GeminiModel = "gemini-2.5-flash-lite" // For PDFs
 )
 
+// GeminiConfig holds configuration for Gemini client
+type GeminiConfig struct {
+	UseVertexAI bool   // true = Vertex AI, false = Gemini API
+	APIKey      string // For Gemini API backend
+	Project     string // For Vertex AI backend
+	Location    string // For Vertex AI backend (default: us-central1)
+}
+
+// GeminiConfigFromEnv creates a GeminiConfig from environment variables.
+// If GOOGLE_CLOUD_PROJECT is set, uses Vertex AI backend (better quotas, IAM auth).
+// Otherwise, uses Gemini API with GEMINI_API_KEY or the provided fallbackAPIKey.
+func GeminiConfigFromEnv(fallbackAPIKey string) GeminiConfig {
+	if project := os.Getenv("GOOGLE_CLOUD_PROJECT"); project != "" {
+		location := os.Getenv("GOOGLE_CLOUD_LOCATION")
+		if location == "" {
+			location = "us-central1"
+		}
+		return GeminiConfig{
+			UseVertexAI: true,
+			Project:     project,
+			Location:    location,
+		}
+	}
+
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		apiKey = fallbackAPIKey
+	}
+	return GeminiConfig{
+		UseVertexAI: false,
+		APIKey:      apiKey,
+	}
+}
+
+// GeminiClient wraps the Google Gen AI SDK client
 type GeminiClient struct {
-	apiKey     string
-	httpClient *http.Client
+	client *genai.Client
 }
 
-type geminiRequest struct {
-	Contents         []geminiContent   `json:"contents"`
-	GenerationConfig *generationConfig `json:"generationConfig,omitempty"`
-}
+// NewGeminiClient creates a client using the unified Google Gen AI SDK
+func NewGeminiClient(ctx context.Context, cfg GeminiConfig) (*GeminiClient, error) {
+	var clientCfg *genai.ClientConfig
 
-type generationConfig struct {
-	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
-	Temperature     *float64 `json:"temperature,omitempty"`
-}
-
-type geminiContent struct {
-	Parts []geminiPart `json:"parts"`
-}
-
-type geminiPart struct {
-	Text *string `json:"text,omitempty"`
-}
-
-type geminiResponse struct {
-	Candidates []geminiCandidate `json:"candidates"`
-}
-
-type geminiCandidate struct {
-	Content geminiContent `json:"content"`
-}
-
-func NewGeminiClient(apiKey string) *GeminiClient {
-	// Create a custom transport that removes the project header
-	transport := &headerStripTransport{
-		Base: http.DefaultTransport,
+	if cfg.UseVertexAI {
+		// Vertex AI backend - uses Application Default Credentials
+		if cfg.Project == "" {
+			return nil, fmt.Errorf("project is required for Vertex AI backend")
+		}
+		location := cfg.Location
+		if location == "" {
+			location = "us-central1"
+		}
+		clientCfg = &genai.ClientConfig{
+			Project:  cfg.Project,
+			Location: location,
+			Backend:  genai.BackendVertexAI,
+		}
+	} else {
+		// Gemini API backend - uses API key
+		if cfg.APIKey == "" {
+			return nil, fmt.Errorf("API key is required for Gemini API backend")
+		}
+		clientCfg = &genai.ClientConfig{
+			APIKey:  cfg.APIKey,
+			Backend: genai.BackendGeminiAPI,
+		}
 	}
 
-	return &GeminiClient{
-		apiKey: strings.TrimSpace(apiKey),
-		httpClient: &http.Client{
-			Timeout:   90 * time.Second,
-			Transport: transport,
-		},
+	client, err := genai.NewClient(ctx, clientCfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create genai client: %w", err)
 	}
+
+	return &GeminiClient{client: client}, nil
 }
 
-// headerStripTransport removes the X-Goog-User-Project header
-type headerStripTransport struct {
-	Base http.RoundTripper
-}
-
-func (t *headerStripTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Clone the request to avoid modifying the original
-	newReq := req.Clone(req.Context())
-	// Remove the project header that Cloud Run adds
-	newReq.Header.Del("X-Goog-User-Project")
-	return t.Base.RoundTrip(newReq)
-}
-
+// Complete generates text from a prompt using the specified model
 func (c *GeminiClient) Complete(ctx context.Context, prompt string, model GeminiModel) (string, error) {
 	return c.CompleteWithTemp(ctx, prompt, model, nil)
 }
 
+// CompleteWithTemp generates text with optional temperature control
 func (c *GeminiClient) CompleteWithTemp(ctx context.Context, prompt string, model GeminiModel, temperature *float64) (string, error) {
-	if c.apiKey == "" {
-		return "", fmt.Errorf("gemini API key is empty")
-	}
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", model, c.apiKey)
-
-	text := prompt
-	req := geminiRequest{
-		Contents: []geminiContent{
-			{
-				Parts: []geminiPart{
-					{Text: &text},
-				},
-			},
-		},
-	}
-
-	// Add temperature if specified
+	var config *genai.GenerateContentConfig
 	if temperature != nil {
-		req.GenerationConfig = &generationConfig{
-			Temperature: temperature,
+		temp32 := float32(*temperature)
+		config = &genai.GenerateContentConfig{
+			Temperature: &temp32,
 		}
 	}
 
-	body, err := json.Marshal(req)
+	result, err := c.client.Models.GenerateContent(ctx,
+		string(model),
+		genai.Text(prompt),
+		config,
+	)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", fmt.Errorf("generate content failed: %w", err)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(httpReq)
-	if err != nil {
-		return "", fmt.Errorf("request failed: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		// Log the actual error for debugging
-		if resp.StatusCode == 429 {
-			return "", fmt.Errorf("gemini API returned status %d: %s (key prefix: %s...)", resp.StatusCode, string(body), c.apiKey[:10])
-		}
-		return "", fmt.Errorf("gemini API returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	var geminiResp geminiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&geminiResp); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
-		return "", fmt.Errorf("no response from Gemini")
-	}
-
-	return *geminiResp.Candidates[0].Content.Parts[0].Text, nil
+	return result.Text(), nil
 }

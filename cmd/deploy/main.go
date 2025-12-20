@@ -380,11 +380,14 @@ func buildAndPush(config *Config) error {
 func deployToCloudRun(config *Config) error {
 	imageName := fmt.Sprintf("gcr.io/%s/%s:latest", config.ProjectID, config.ServiceName)
 
+	// Use Vertex AI in Cloud Run deployments (better quotas, IAM auth)
+	// The project ID enables the Vertex AI backend automatically
 	envVars := fmt.Sprintf(
-		"GOOGLE_API_KEY=%s,GOOGLE_CSE_ID=%s,GEMINI_API_KEY=%s",
+		"GOOGLE_API_KEY=%s,GOOGLE_CSE_ID=%s,GOOGLE_CLOUD_PROJECT=%s,GOOGLE_CLOUD_LOCATION=%s",
 		os.Getenv("GOOGLE_API_KEY"),
 		config.GoogleCSEID,
-		os.Getenv("GEMINI_API_KEY"),
+		config.ProjectID,
+		config.Region,
 	)
 
 	args := []string{
@@ -588,10 +591,11 @@ func runValidation(env string) error {
 	envVars, _ := container["env"].([]interface{})
 
 	// Check required environment variables
+	// GOOGLE_CLOUD_PROJECT enables Vertex AI backend (better quotas)
 	requiredVars := []string{
 		"GOOGLE_API_KEY",
 		"GOOGLE_CSE_ID",
-		"GEMINI_API_KEY",
+		"GOOGLE_CLOUD_PROJECT",
 	}
 
 	envMap := make(map[string]string)

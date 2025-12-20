@@ -22,7 +22,7 @@ type SearchAgent struct {
 type Config struct {
 	GoogleAPIKey       string
 	GoogleCSEID        string
-	GeminiAPIKey       string
+	GeminiConfig       GeminiConfig
 	MaxResultsPerQuery int
 }
 
@@ -32,11 +32,7 @@ type SearchResult struct {
 	Sources []string `json:"sources"`
 }
 
-func NewSearchAgent(config Config) (*SearchAgent, error) {
-	if config.GeminiAPIKey == "" {
-		return nil, fmt.Errorf("gemini API key is required")
-	}
-
+func NewSearchAgent(ctx context.Context, config Config) (*SearchAgent, error) {
 	// Google API credentials are optional for testing
 	if config.GoogleAPIKey == "" {
 		config.GoogleAPIKey = "test-key"
@@ -49,11 +45,16 @@ func NewSearchAgent(config Config) (*SearchAgent, error) {
 		config.MaxResultsPerQuery = 10
 	}
 
-	searchClient := NewGoogleSearchClient(config.GoogleAPIKey, config.GoogleCSEID)
-	llmClient := NewGeminiClient(config.GeminiAPIKey)
+	// Create the unified Gemini client (supports both Gemini API and Vertex AI)
+	llmClient, err := NewGeminiClient(ctx, config.GeminiConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
+	}
 
-	// Create PDF processing infrastructure
-	pdfClient := NewPDFClient(config.GeminiAPIKey)
+	searchClient := NewGoogleSearchClient(config.GoogleAPIKey, config.GoogleCSEID)
+
+	// Create PDF processing infrastructure using the shared genai client
+	pdfClient := NewPDFClient(llmClient.client)
 	pdfChunker := content.NewPDFChunker()
 	pdfHandler := content.NewPDFHandler(pdfClient, pdfChunker)
 

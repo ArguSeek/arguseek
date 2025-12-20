@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 
 func main() {
 	log.Println("=== ArguSeek Debug Server Starting ===")
+	ctx := context.Background()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -25,11 +27,13 @@ func main() {
 	googleCSEID := os.Getenv("GOOGLE_CSE_ID")
 	log.Printf("GOOGLE_CSE_ID present: %v", googleCSEID != "")
 
-	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
-	if geminiAPIKey == "" {
-		geminiAPIKey = googleAPIKey
+	// Configure Gemini backend
+	geminiCfg := agent.GeminiConfigFromEnv(googleAPIKey)
+	if geminiCfg.UseVertexAI {
+		log.Printf("Using Vertex AI backend (project: %s, location: %s)", geminiCfg.Project, geminiCfg.Location)
+	} else {
+		log.Printf("Using Gemini API backend (key present: %v)", geminiCfg.APIKey != "")
 	}
-	log.Printf("GEMINI_API_KEY present: %v", geminiAPIKey != "")
 
 	// Try to create search agent
 	var searchAgent *agent.SearchAgent
@@ -37,10 +41,10 @@ func main() {
 
 	if googleAPIKey != "" && googleCSEID != "" {
 		log.Println("Creating search agent...")
-		searchAgent, agentErr = agent.NewSearchAgent(agent.Config{
+		searchAgent, agentErr = agent.NewSearchAgent(ctx, agent.Config{
 			GoogleAPIKey:       googleAPIKey,
 			GoogleCSEID:        googleCSEID,
-			GeminiAPIKey:       geminiAPIKey,
+			GeminiConfig:       geminiCfg,
 			MaxResultsPerQuery: 10,
 		})
 		if agentErr != nil {
@@ -68,7 +72,12 @@ func main() {
 				"google_api_key_length":  len(googleAPIKey),
 				"google_cse_id_present":  googleCSEID != "",
 				"google_cse_id_length":   len(googleCSEID),
-				"gemini_api_key_present": geminiAPIKey != "",
+			},
+			"gemini": map[string]interface{}{
+				"use_vertex_ai": geminiCfg.UseVertexAI,
+				"project":       geminiCfg.Project,
+				"location":      geminiCfg.Location,
+				"api_key_set":   geminiCfg.APIKey != "",
 			},
 			"agent": map[string]interface{}{
 				"created": searchAgent != nil,
