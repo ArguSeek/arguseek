@@ -25,12 +25,28 @@ import (
 // By default, the server runs in stdio mode for MCP clients like Claude Code CLI.
 // Use the -http flag to run as an HTTP server (for Cloud Run deployments).
 //
+// CLI commands:
+// - arguseek research "<query>" [--previous "<previous query>"]
+// - arguseek fetch <url> [--looking-for "<extraction hint>"]
+//
 // Security: For production deployments, add authentication externally via:
 // - Reverse proxy (nginx, Caddy, Traefik)
 // - Cloud Run IAM authentication
 // - API Gateway with custom authorizer
 // - See PRODUCTION_SECURITY.md for detailed options
 func main() {
+	// Check for subcommands before flag parsing
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "research":
+			runResearchCLI(os.Args[2:])
+			return
+		case "fetch":
+			runFetchCLI(os.Args[2:])
+			return
+		}
+	}
+
 	// Parse command-line flags
 	httpMode := flag.Bool("http", false, "run as HTTP server instead of stdio mode")
 	versionFlag := flag.Bool("version", false, "print version information and exit")
@@ -61,36 +77,8 @@ func main() {
 		port = "8080"
 	}
 
-	// Load API keys from environment variables
-	googleAPIKey := os.Getenv("GOOGLE_API_KEY")
-	if googleAPIKey == "" {
-		logging.Fatal(ctx, "GOOGLE_API_KEY environment variable is required")
-	}
-
-	googleCSEID := os.Getenv("GOOGLE_CSE_ID")
-	if googleCSEID == "" {
-		logging.Fatal(ctx, "GOOGLE_CSE_ID environment variable is required")
-	}
-
-	geminiAPIKey := os.Getenv("GEMINI_API_KEY")
-	if geminiAPIKey == "" {
-		geminiAPIKey = googleAPIKey
-		logging.Info(ctx, "GEMINI_API_KEY not set, using GOOGLE_API_KEY")
-	}
-
-	// Debug logging
-	logging.Info(ctx, "API Keys loaded from environment", map[string]interface{}{
-		"google_key_prefix": googleAPIKey[:10] + "...",
-		"gemini_key_prefix": geminiAPIKey[:10] + "...",
-		"keys_are_same":     googleAPIKey == geminiAPIKey,
-	})
-
-	searchAgent, err := agent.NewSearchAgent(agent.Config{
-		GoogleAPIKey:       googleAPIKey,
-		GoogleCSEID:        googleCSEID,
-		GeminiAPIKey:       geminiAPIKey,
-		MaxResultsPerQuery: 10,
-	})
+	// Create search agent from environment
+	searchAgent, err := initSearchAgent(ctx)
 	if err != nil {
 		logging.Fatal(ctx, "Failed to create search agent", map[string]interface{}{
 			"error": err.Error(),
@@ -209,4 +197,125 @@ func main() {
 
 	<-done
 	logging.Info(ctx, "Server stopped")
+}
+
+// initSearchAgent creates a configured SearchAgent from environment variables.
+func initSearchAgent(ctx context.Context) (*agent.SearchAgent, error) {
+	googleAPIKey := os.Getenv("GOOGLE_API_KEY")
+	if googleAPIKey == "" {
+		return nil, fmt.Errorf("GOOGLE_API_KEY environment variable is required")
+	}
+
+	googleCSEID := os.Getenv("GOOGLE_CSE_ID")
+	if googleCSEID == "" {
+		return nil, fmt.Errorf("GOOGLE_CSE_ID environment variable is required")
+	}
+
+	geminiCfg := agent.GeminiConfigFromEnv(googleAPIKey)
+	if geminiCfg.UseVertexAI {
+		logging.Info(ctx, "Using Vertex AI backend", map[string]interface{}{
+			"project":  geminiCfg.Project,
+			"location": geminiCfg.Location,
+		})
+	} else {
+		logging.Info(ctx, "Using Gemini API backend", nil)
+	}
+
+	return agent.NewSearchAgent(ctx, agent.Config{
+		GoogleAPIKey:       googleAPIKey,
+		GoogleCSEID:        googleCSEID,
+		GeminiConfig:       geminiCfg,
+		MaxResultsPerQuery: 10,
+	})
+}
+
+// runResearchCLI handles the "arguseek research" subcommand.
+func runResearchCLI(args []string) {
+	fs := flag.NewFlagSet("research", flag.ExitOnError)
+	previous := fs.String("previous", "", "previous query for context chaining")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: arguseek research <query> [--previous <previous query>]\n\n")
+		fmt.Fprintf(os.Stderr, "Perform iterative web research using Google Search and Gemini.\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fs.PrintDefaults()
+	}
+
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+
+	if fs.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "Error: query argument is required")
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	query := fs.Arg(0)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	// Suppress logs for CLI mode - only output results
+	log.SetOutput(os.Stderr)
+
+	searchAgent, err := initSearchAgent(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	var previousQuery *string
+	if *previous != "" {
+		previousQuery = previous
+	}
+
+	result, err := searchAgent.ResearchIteratively(ctx, query, previousQuery)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println(result)
+}
+
+// runFetchCLI handles the "arguseek fetch" subcommand.
+func runFetchCLI(args []string) {
+	fs := flag.NewFlagSet("fetch", flag.ExitOnError)
+	lookingFor := fs.String("looking-for", "", "what information to extract from the page")
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: arguseek fetch <url> [--looking-for <extraction hint>]\n\n")
+		fmt.Fprintf(os.Stderr, "Fetch and extract content from a webpage URL.\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		fs.PrintDefaults()
+	}
+
+	if err := fs.Parse(args); err != nil {
+		os.Exit(1)
+	}
+
+	if fs.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "Error: url argument is required")
+		fs.Usage()
+		os.Exit(1)
+	}
+
+	url := fs.Arg(0)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	// Suppress logs for CLI mode - only output results
+	log.SetOutput(os.Stderr)
+
+	searchAgent, err := initSearchAgent(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	result, err := searchAgent.FetchURL(ctx, url, *lookingFor)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Println(result)
 }
