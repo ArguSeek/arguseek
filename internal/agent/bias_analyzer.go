@@ -17,14 +17,14 @@ func NewBiasAnalyzer(llmClient LLMClient) *BiasAnalyzer {
 	}
 }
 
-func (b *BiasAnalyzer) AnalyzeBias(ctx context.Context, fetchedContent map[string]string) BiasAnalysisResult {
+func (b *BiasAnalyzer) AnalyzeBias(ctx context.Context, fetchedContent map[string]string, biasTruncation int) BiasAnalysisResult {
 	if len(fetchedContent) == 0 {
 		return BiasAnalysisResult{
 			BiasCategory: "none",
 		}
 	}
 
-	prompt := b.buildBiasAnalysisPrompt(fetchedContent)
+	prompt := b.buildBiasAnalysisPrompt(fetchedContent, biasTruncation)
 
 	// Use temperature 0.2 for consistent yet slightly varied analysis
 	temp := 0.2
@@ -40,14 +40,14 @@ func (b *BiasAnalyzer) AnalyzeBias(ctx context.Context, fetchedContent map[strin
 	return b.parseResponse(response)
 }
 
-func (b *BiasAnalyzer) buildBiasAnalysisPrompt(fetchedContent map[string]string) string {
+func (b *BiasAnalyzer) buildBiasAnalysisPrompt(fetchedContent map[string]string, biasTruncation int) string {
 	var xmlBuilder strings.Builder
 	xmlBuilder.WriteString("<SOURCES>\n")
 
 	for url, content := range fetchedContent {
 		if content != "" {
 			// Truncate content and escape XML
-			escapedContent := escapeXML(truncateContent(content, 10000))
+			escapedContent := escapeXML(truncateContent(content, biasTruncation))
 			escapedURL := escapeXML(url)
 			xmlBuilder.WriteString(fmt.Sprintf(`  <SOURCE url="%s">%s</SOURCE>%s`,
 				escapedURL, escapedContent, "\n"))

@@ -33,7 +33,7 @@ func TestBiasAnalyzer_AnalyzeBias_None(t *testing.T) {
 		"https://example3.com": "Critical analysis showing limitations",
 	}
 
-	result := analyzer.AnalyzeBias(context.Background(), fetchedContent)
+	result := analyzer.AnalyzeBias(context.Background(), fetchedContent, 10000)
 
 	if result.BiasCategory != "none" {
 		t.Errorf("Expected category 'none', got '%s'", result.BiasCategory)
@@ -57,7 +57,7 @@ func TestBiasAnalyzer_AnalyzeBias_SEOCampaign(t *testing.T) {
 		"https://blog3.com": "Best solution for modern React with hooks industry-leading",
 	}
 
-	result := analyzer.AnalyzeBias(context.Background(), fetchedContent)
+	result := analyzer.AnalyzeBias(context.Background(), fetchedContent, 10000)
 
 	if result.BiasCategory != "seo_campaign" {
 		t.Errorf("Expected category 'seo_campaign', got '%s'", result.BiasCategory)
@@ -85,7 +85,7 @@ func TestBiasAnalyzer_AnalyzeBias_ProductPromotion(t *testing.T) {
 		"https://review3.com": "Next.js is perfect solution. Small price concern but worth it.",
 	}
 
-	result := analyzer.AnalyzeBias(context.Background(), fetchedContent)
+	result := analyzer.AnalyzeBias(context.Background(), fetchedContent, 10000)
 
 	if result.BiasCategory != "product_promotion" {
 		t.Errorf("Expected category 'product_promotion', got '%s'", result.BiasCategory)
@@ -109,7 +109,7 @@ func TestBiasAnalyzer_AnalyzeBias_UnanimousTechnical(t *testing.T) {
 		"https://tech3.com": "Microservices solve all scalability problems and should be used everywhere",
 	}
 
-	result := analyzer.AnalyzeBias(context.Background(), fetchedContent)
+	result := analyzer.AnalyzeBias(context.Background(), fetchedContent, 10000)
 
 	if result.BiasCategory != "unanimous_technical" {
 		t.Errorf("Expected category 'unanimous_technical', got '%s'", result.BiasCategory)
@@ -133,7 +133,7 @@ func TestBiasAnalyzer_AnalyzeBias_OneSided(t *testing.T) {
 		"https://ai3.com": "AI is the perfect solution with unlimited potential for growth",
 	}
 
-	result := analyzer.AnalyzeBias(context.Background(), fetchedContent)
+	result := analyzer.AnalyzeBias(context.Background(), fetchedContent, 10000)
 
 	if result.BiasCategory != "one_sided" {
 		t.Errorf("Expected category 'one_sided', got '%s'", result.BiasCategory)
@@ -148,7 +148,7 @@ func TestBiasAnalyzer_AnalyzeBias_EmptyContent(t *testing.T) {
 	mockLLM := &MockLLMClient{}
 	analyzer := NewBiasAnalyzer(mockLLM)
 
-	result := analyzer.AnalyzeBias(context.Background(), map[string]string{})
+	result := analyzer.AnalyzeBias(context.Background(), map[string]string{}, 10000)
 
 	if result.BiasCategory != "none" {
 		t.Errorf("Expected category 'none' for empty content, got '%s'", result.BiasCategory)
@@ -166,7 +166,7 @@ func TestBiasAnalyzer_AnalyzeBias_ParseError(t *testing.T) {
 		"https://example.com": "Some content",
 	}
 
-	result := analyzer.AnalyzeBias(context.Background(), fetchedContent)
+	result := analyzer.AnalyzeBias(context.Background(), fetchedContent, 10000)
 
 	if result.BiasCategory != "none" {
 		t.Errorf("Expected category 'none' on parse error, got '%s'", result.BiasCategory)
@@ -188,7 +188,7 @@ func TestBiasAnalyzer_AnalyzeBias_InvalidCategory(t *testing.T) {
 		"https://example.com": "Some content",
 	}
 
-	result := analyzer.AnalyzeBias(context.Background(), fetchedContent)
+	result := analyzer.AnalyzeBias(context.Background(), fetchedContent, 10000)
 
 	if result.BiasCategory != "none" {
 		t.Errorf("Expected category 'none' for invalid category, got '%s'", result.BiasCategory)
@@ -210,7 +210,7 @@ func TestBiasAnalyzer_AnalyzeBias_NoneOverridesCounterQuery(t *testing.T) {
 		"https://example.com": "Balanced content with multiple perspectives",
 	}
 
-	result := analyzer.AnalyzeBias(context.Background(), fetchedContent)
+	result := analyzer.AnalyzeBias(context.Background(), fetchedContent, 10000)
 
 	if result.BiasCategory != "none" {
 		t.Errorf("Expected category 'none', got '%s'", result.BiasCategory)

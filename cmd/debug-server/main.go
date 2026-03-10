@@ -104,7 +104,7 @@ func main() {
 		}
 
 		log.Printf("Testing search with query: %s", query)
-		result, err := searchAgent.ResearchIteratively(r.Context(), query, nil)
+		result, err := searchAgent.ResearchIteratively(r.Context(), query, nil, agent.DepthNormal)
 
 		response := map[string]interface{}{
 			"query":  query,
