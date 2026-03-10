@@ -61,7 +61,7 @@ func validateQuotePreservation(original string, processed []string) bool {
 	return true
 }
 
-func (a *SearchAgent) preprocessQuery(ctx context.Context, query string, previousQuery *string) (*PreprocessorResult, error) {
+func (a *SearchAgent) preprocessQuery(ctx context.Context, query string, previousQuery *string, targetQueryCount int) (*PreprocessorResult, error) {
 	currentYear := time.Now().Format("2006")
 
 	// Build context section
@@ -105,7 +105,7 @@ When no previous_query:
 2. Generate comprehensive search variations
 3. Add temporal markers where appropriate
 
-IMPORTANT: Always generate EXACTLY 3 queries - no more, no less.
+IMPORTANT: Always generate EXACTLY %d queries - no more, no less.
 </INSTRUCTIONS>
 
 <EXAMPLES>
@@ -188,7 +188,7 @@ Return JSON format:
   "original_query": "<normalized input query>",
   "queries": ["<query1>", "<query2>", "<query3>"],
   "date_corrected": true/false
-}`, currentYear, contextSection, currentYear)
+}`, currentYear, contextSection, targetQueryCount, currentYear)
 
 	response, err := a.llmClient.Complete(ctx, prompt, GeminiFlash25)
 	if err != nil {
@@ -217,17 +217,17 @@ Return JSON format:
 		}, nil
 	}
 
-	// Ensure we have exactly 3 queries
+	// Ensure we have the target number of queries
 	if len(result.Queries) == 0 {
 		result.Queries = []string{query}
 	}
 
-	// Enforce exactly 3 queries
-	if len(result.Queries) > 3 {
-		result.Queries = result.Queries[:3]
-	} else if len(result.Queries) < 3 {
+	// Enforce exactly targetQueryCount queries
+	if len(result.Queries) > targetQueryCount {
+		result.Queries = result.Queries[:targetQueryCount]
+	} else if len(result.Queries) < targetQueryCount {
 		// Pad with variations of the original query
-		for len(result.Queries) < 3 {
+		for len(result.Queries) < targetQueryCount {
 			if len(result.Queries) == 1 {
 				result.Queries = append(result.Queries, query+" 2025")
 			} else {

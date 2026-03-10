@@ -88,23 +88,34 @@ func NewSearchAgentWithDependencies(config Config, searchClient SearchClient, ll
 }
 
 // TestPreprocessor exposes the preprocessor for testing
-func (a *SearchAgent) TestPreprocessor(ctx context.Context, query string, previousQuery *string) (*PreprocessorResult, error) {
-	return a.preprocessQuery(ctx, query, previousQuery)
+func (a *SearchAgent) TestPreprocessor(ctx context.Context, query string, previousQuery *string, targetQueryCount int) (*PreprocessorResult, error) {
+	return a.preprocessQuery(ctx, query, previousQuery, targetQueryCount)
 }
 
-func (a *SearchAgent) ResearchIteratively(ctx context.Context, query string, previousQuery *string) (string, error) {
+func (a *SearchAgent) ResearchIteratively(ctx context.Context, query string, previousQuery *string, depth ResearchDepth) (string, error) {
 	if strings.TrimSpace(query) == "" {
 		return "", fmt.Errorf("query cannot be empty")
 	}
 
-	// Use preprocessor to get optimized queries
-	preprocessResult, err := a.preprocessQuery(ctx, query, previousQuery)
-	if err != nil {
-		// Fallback to original query on error
+	dc := GetDepthConfig(depth)
+
+	var preprocessResult *PreprocessorResult
+	if dc.SkipPreprocessor {
 		preprocessResult = &PreprocessorResult{
 			OriginalQuery: query,
 			Queries:       []string{query},
 			DateCorrected: false,
+		}
+	} else {
+		var err error
+		preprocessResult, err = a.preprocessQuery(ctx, query, previousQuery, dc.TargetQueryCount)
+		if err != nil {
+			// Fallback to original query on error
+			preprocessResult = &PreprocessorResult{
+				OriginalQuery: query,
+				Queries:       []string{query},
+				DateCorrected: false,
+			}
 		}
 	}
 
@@ -118,7 +129,7 @@ func (a *SearchAgent) ResearchIteratively(ctx context.Context, query string, pre
 		go func(idx int, searchQuery string) {
 			defer wg.Done()
 
-			results, err := a.searchClient.Search(ctx, searchQuery, a.config.MaxResultsPerQuery)
+			results, err := a.searchClient.Search(ctx, searchQuery, dc.MaxResultsPerQuery)
 			if err != nil {
 				searchTasks[idx] = SearchTask{
 					Query: searchQuery,
@@ -171,8 +182,8 @@ func (a *SearchAgent) ResearchIteratively(ctx context.Context, query string, pre
 		return urlPairs[i].index < urlPairs[j].index
 	})
 
-	// Take up to 30 unique URLs (15 primary + 15 backup for fallback mechanism)
-	maxURLs := min(30, len(urlPairs))
+	// Take up to primary+backup unique URLs for fallback mechanism
+	maxURLs := min(dc.PrimaryURLCount+dc.BackupURLCount, len(urlPairs))
 
 	allURLs := make([]string, maxURLs)
 	for i := 0; i < maxURLs; i++ {
@@ -187,7 +198,7 @@ func (a *SearchAgent) ResearchIteratively(ctx context.Context, query string, pre
 	}
 
 	// Content fetching with fallback mechanism
-	primaryCount := min(15, len(allURLs))
+	primaryCount := min(dc.PrimaryURLCount, len(allURLs))
 	primaryURLs := allURLs[:primaryCount]
 	var backupURLs []string
 
@@ -195,7 +206,7 @@ func (a *SearchAgent) ResearchIteratively(ctx context.Context, query string, pre
 		backupURLs = allURLs[primaryCount:]
 	}
 
-	targetSourceCount := 12 // Target: get at least 12 successful sources
+	targetSourceCount := dc.TargetSources
 
 	// Use fallback mechanism: try primary URLs first, then backups if needed
 	fetchedContent, err := a.fetcher.FetchMultipleWithFallback(ctx, primaryURLs, backupURLs, targetSourceCount)
@@ -205,10 +216,14 @@ func (a *SearchAgent) ResearchIteratively(ctx context.Context, query string, pre
 
 	// Run bias analysis and synthesis concurrently
 	biasResultChan := make(chan BiasAnalysisResult, 1)
-	go func() {
-		result := a.biasAnalyzer.AnalyzeBias(ctx, fetchedContent)
-		biasResultChan <- result
-	}()
+	if dc.EnableBias {
+		go func() {
+			result := a.biasAnalyzer.AnalyzeBias(ctx, fetchedContent, dc.BiasTruncation)
+			biasResultChan <- result
+		}()
+	} else {
+		biasResultChan <- BiasAnalysisResult{BiasCategory: "none"}
+	}
 
 	// Run synthesis in parallel with bias analysis
 	type synthesisResult struct {
@@ -219,7 +234,7 @@ func (a *SearchAgent) ResearchIteratively(ctx context.Context, query string, pre
 	go func() {
 		// Use default bias result for initial synthesis
 		tempBiasResult := BiasAnalysisResult{BiasCategory: "none"}
-		answer, err := a.synthesizeAnswer(ctx, preprocessResult.OriginalQuery, previousQuery, allResults, fetchedContent, tempBiasResult)
+		answer, err := a.synthesizeAnswer(ctx, preprocessResult.OriginalQuery, previousQuery, allResults, fetchedContent, tempBiasResult, dc.ContentTruncation)
 		synthesisResultChan <- synthesisResult{answer: answer, err: err}
 	}()
 
@@ -465,7 +480,7 @@ func (a *SearchAgent) detectSourceType(url string) string {
 	return "general"
 }
 
-func (a *SearchAgent) synthesizeAnswer(ctx context.Context, query string, previousQuery *string, results []GoogleSearchResult, fetchedContent map[string]string, biasResult BiasAnalysisResult) (string, error) {
+func (a *SearchAgent) synthesizeAnswer(ctx context.Context, query string, previousQuery *string, results []GoogleSearchResult, fetchedContent map[string]string, biasResult BiasAnalysisResult, contentTruncation int) (string, error) {
 	// Detect query intent
 	queryIntent := a.detectQueryIntent(query)
 
@@ -483,8 +498,7 @@ func (a *SearchAgent) synthesizeAnswer(ctx context.Context, query string, previo
 			sourceTypes[url] = sourceType
 
 			// CRITICAL: Escape XML special characters
-			// Using 30,000 chars per document (well within 1M token limit)
-			escapedContent := escapeXML(truncateContent(content, 30000))
+			escapedContent := escapeXML(truncateContent(content, contentTruncation))
 			escapedURL := escapeXML(url)
 
 			xmlBuilder.WriteString(fmt.Sprintf(`  <SOURCE url="%s" type="%s">%s</SOURCE>%s`,

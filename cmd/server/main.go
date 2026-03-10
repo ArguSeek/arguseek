@@ -233,8 +233,9 @@ func initSearchAgent(ctx context.Context) (*agent.SearchAgent, error) {
 func runResearchCLI(args []string) {
 	fs := flag.NewFlagSet("research", flag.ExitOnError)
 	previous := fs.String("previous", "", "previous query for context chaining")
+	depthFlag := fs.String("depth", "normal", "research depth: fast, normal, deep")
 	fs.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: arguseek research <query> [--previous <previous query>]\n\n")
+		fmt.Fprintf(os.Stderr, "Usage: arguseek research <query> [--previous <previous query>] [--depth fast|normal|deep]\n\n")
 		fmt.Fprintf(os.Stderr, "Perform iterative web research using Google Search and Gemini.\n\n")
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		fs.PrintDefaults()
@@ -268,7 +269,8 @@ func runResearchCLI(args []string) {
 		previousQuery = previous
 	}
 
-	result, err := searchAgent.ResearchIteratively(ctx, query, previousQuery)
+	depth := agent.ParseDepth(*depthFlag)
+	result, err := searchAgent.ResearchIteratively(ctx, query, previousQuery, depth)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)

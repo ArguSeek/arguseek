@@ -40,6 +40,7 @@ type Params struct {
 type Arguments struct {
 	Query         string  `json:"query"`
 	PreviousQuery *string `json:"previous_query,omitempty"`
+	Depth         string  `json:"depth,omitempty"`
 	URL           string  `json:"url"`
 	LookingFor    string  `json:"looking_for,omitempty"`
 }
@@ -284,6 +285,11 @@ func (h *Handler) processToolsList(req Request) (*Response, error) {
 						"type":        "string",
 						"description": "Previous query to build context and chain knowledge (optional)",
 					},
+					"depth": map[string]interface{}{
+						"type":        "string",
+						"description": "Research depth: 'fast' (1 query, fewer sources, no bias check), 'normal' (default, balanced), 'deep' (5 queries, more sources)",
+						"enum":        []string{"fast", "normal", "deep"},
+					},
 				},
 				Required: []string{"query"},
 			},
@@ -371,7 +377,8 @@ func (h *Handler) processToolsCall(ctx context.Context, req Request) (*Response,
 			}
 		}
 
-		result, err := h.agent.ResearchIteratively(ctx, params.Arguments.Query, params.Arguments.PreviousQuery)
+		depth := agent.ParseDepth(params.Arguments.Depth)
+		result, err := h.agent.ResearchIteratively(ctx, params.Arguments.Query, params.Arguments.PreviousQuery, depth)
 		if err != nil {
 			return &Response{
 				JSONRPC: "2.0",
